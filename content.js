@@ -95,8 +95,14 @@
    * Receives raw comment objects from injected.js and indexes them by timestamp.
    * Each comment may generate multiple entries (one per timestamp found in it).
    */
-  function ingestComments(rawComments) {
+  function ingestComments(rawComments, fromVideoId) {
     if (!Array.isArray(rawComments)) return;
+
+    // Reject batches that belong to a different video (stale from previous page)
+    if (fromVideoId && fromVideoId !== state.lastVideoId) {
+      log(`Ignoring ${rawComments.length} comment(s) from video ${fromVideoId} (current: ${state.lastVideoId})`);
+      return;
+    }
 
     const existingKeys = new Set(
       state.comments.map(c => commentKey(c.seconds, c.text))
@@ -208,11 +214,18 @@
 
     const expandHint = document.createElement('span');
     expandHint.className = 'ytsc-expand-hint';
-    expandHint.textContent = '↔';
+    expandHint.textContent = '\u2194';
 
     const pauseIcon = document.createElement('span');
     pauseIcon.className = 'ytsc-pause-icon';
-    pauseIcon.textContent = '⏸';
+    pauseIcon.textContent = '\u23f8';
+
+    // Close button — top-right corner, appears on hover/pause/expand
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'ytsc-close-btn';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.title = 'Fechar';
+    closeBtn.setAttribute('aria-label', 'Fechar comentário');
 
     header.appendChild(authorEl);
     header.appendChild(badge);
@@ -222,13 +235,8 @@
     textEl.className = 'ytsc-text';
     textEl.innerHTML = highlightText(comment.text);
 
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'ytsc-close-btn';
-    closeBtn.textContent = '✕ fechar';
-
     content.appendChild(header);
     content.appendChild(textEl);
-    content.appendChild(closeBtn);
 
     // Progress bar (animation-based so it can be CSS-paused)
     const pw = document.createElement('div');
@@ -238,7 +246,8 @@
     pw.appendChild(pb);
     content.appendChild(pw);
 
-    card.appendChild(pauseIcon);
+    card.appendChild(closeBtn);   // absolute top-right
+    card.appendChild(pauseIcon);  // absolute bottom-right
     card.appendChild(avatarEl);
     card.appendChild(content);
     state.overlayEl.appendChild(card);
@@ -273,9 +282,9 @@
 
     // ── Click: expand card (show full text) ───────────────
     card.addEventListener('click', (e) => {
-      if (e.target === closeBtn) return; // handled by closeBtn
+      if (e.target === closeBtn) return; // handled by closeBtn listener
       if (card.classList.contains('ytsc-expanded')) return;
-      // Expand
+      // Expand: pin card, show full text
       clearTimeout(card._ytscTimer);
       card.classList.remove('ytsc-paused');
       card.classList.add('ytsc-expanded');
@@ -419,7 +428,7 @@
       event.data?.source !== 'yt-super-comments-injected' ||
       event.data?.type   !== 'YTSC_COMMENTS'
     ) return;
-    ingestComments(event.data.comments);
+    ingestComments(event.data.comments, event.data.videoId);
   });
 
   /** Receive commands from popup.js */

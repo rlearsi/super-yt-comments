@@ -220,9 +220,18 @@
 
   // ─── Send to content.js ───────────────────────────────
 
+  function currentVideoId() {
+    try { return new URL(location.href).searchParams.get('v') || ''; } catch { return ''; }
+  }
+
   function sendComments(comments) {
     if (!comments?.length) return;
-    window.postMessage({ type: 'YTSC_COMMENTS', source: SOURCE, comments }, '*');
+    window.postMessage({
+      type:    'YTSC_COMMENTS',
+      source:  SOURCE,
+      videoId: currentVideoId(), // so content.js can reject stale batches
+      comments,
+    }, '*');
   }
 
   // ─── Passive: intercept fetch + XHR ───────────────────
