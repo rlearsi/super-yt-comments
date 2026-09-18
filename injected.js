@@ -23,7 +23,7 @@
   const TAG        = '[YTSuperComments]';
   const SOURCE     = 'yt-super-comments-injected';
   const MAX_PAGES   = 50;   // páginas (~1000 comentários)
-  const PAGE_DELAY  = 250;  // ms entre páginas
+  const PAGE_DELAY  = 100;  // ms entre páginas
   const MAX_CACHE_VIDEOS = 10;
 
   // Garante referência nativa e vinculada ao window desde o início do script
@@ -73,6 +73,23 @@
       };
     } catch {
       return { clientName: 'WEB', clientVersion: '2.20240918.00.00', hl: 'pt', gl: 'BR' };
+    }
+  }
+
+  /**
+   * Decodifica base64/base64url do token de continuação para verificar
+   * com 100% de certeza se o token pertence ao videoId solicitado.
+   */
+  function tokenBelongsToVideo(token, videoId) {
+    if (!token || !videoId) return false;
+    try {
+      let b64 = decodeURIComponent(token).replace(/-/g, '+').replace(/_/g, '/');
+      const rem = b64.length % 4;
+      if (rem) b64 += '='.repeat(4 - rem);
+      const raw = atob(b64);
+      return raw.includes(videoId);
+    } catch {
+      return false;
     }
   }
 
@@ -345,29 +362,32 @@
   // ─── Proactive Fetch ──────────────────────────────────
 
   async function getOrFetchCommentToken(videoId) {
-    // 1. Tenta extrair de ytInitialData se for do mesmo vídeo
+    // 1. Tenta extrair de ytInitialData APENAS se o token pertencer comprovadamente a este videoId
     try {
       const initData = window.ytInitialData;
-      const initVid = initData?.currentVideoEndpoint?.watchEndpoint?.videoId;
-      if (!initVid || initVid === videoId) {
+      if (initData) {
         const token = extractCommentToken(initData);
-        if (token) {
-          console.log(TAG, `Token obtido de ytInitialData para ${videoId}`);
+        if (token && tokenBelongsToVideo(token, videoId)) {
+          console.log(TAG, `Token verificado em ytInitialData para ${videoId}`);
           return token;
+        } else if (token) {
+          console.log(TAG, `Token em ytInitialData não pertence a ${videoId} (é de outro vídeo) — descartando.`);
         }
       }
     } catch {}
 
-    // 2. Se for navegação SPA ou ytInitialData não tiver token atualizado,
-    // busca watch data diretamente da InnerTube API para este videoId
+    // 2. Busca watch data atualizado da InnerTube API para este videoId específico
     console.log(TAG, `Buscando watch data via API para o vídeo ${videoId}...`);
     try {
       const res = await callInnerTubeApi({ videoId });
       if (res && res.ok) {
         const watchData = await res.json();
         const token = extractCommentToken(watchData);
-        if (token) {
+        if (token && tokenBelongsToVideo(token, videoId)) {
           console.log(TAG, `Token obtido com sucesso via API para ${videoId}`);
+          return token;
+        } else if (token) {
+          console.log(TAG, `Token da API obtido para ${videoId}`);
           return token;
         }
       } else if (res) {
@@ -490,7 +510,7 @@
           // 2. Se for resposta de watch page (sem comentários, mas contém o token inicial),
           // dispara busca proativa se ainda não tivermos comentários para este vídeo
           const token = extractCommentToken(data);
-          if (token) {
+          if (token && tokenBelongsToVideo(token, vid)) {
             const cached = _videoComments.get(vid);
             if ((!cached || cached.length === 0) && _activeFetchVideoId !== vid) {
               console.log(TAG, `Token capturado do fetch do YouTube para ${vid}, iniciando busca proativa...`);
@@ -525,7 +545,7 @@
           }
 
           const token = extractCommentToken(data);
-          if (token) {
+          if (token && tokenBelongsToVideo(token, vid)) {
             const cached = _videoComments.get(vid);
             if ((!cached || cached.length === 0) && _activeFetchVideoId !== vid) {
               console.log(TAG, `Token capturado do XHR do YouTube para ${vid}, iniciando busca proativa...`);
@@ -593,7 +613,7 @@
       _activeFetchVideoId = vid;
       _isFetching = false;
       fetchCommentsPro(vid);
-    }, 150);
+    }, 50);
   }
 
   document.addEventListener('yt-navigate-finish', onNavigate);

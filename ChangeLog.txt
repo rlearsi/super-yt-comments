@@ -1,5 +1,15 @@
 ## YouTube Super Comments - ChangeLog
 
+### v1.6.2 — 2026-09-18
+- Validação estrita de tokens (tokenBelongsToVideo): descarta tokens obsoletos de ytInitialData em navegações SPA
+- Consulta automática do watch data atualizado da API para novos vídeos
+- Remoção do delay inicial de 800ms em initForVideo (inicialização imediata e retentativas a cada 100ms)
+- Limpeza imediata de todos os cards de comentários residuais na navegação
+- Intervalos de paginação e debounce reduzidos para exibição ultrarrápida
+
+### v1.6.1 — 2026-09-18
+- Correção de TypeError: Failed to fetch (caminho relativo /youtubei/v1/next, credentials same-origin e bound fetch)
+
 ### v1.6.0 — 2026-09-18
 - Busca proativa via InnerTube API totalmente resiliente a navegação SPA (sem recarregar página)
 - Fallback automático para consulta de watch data via API (/youtubei/v1/next com videoId) quando ytInitialData estiver desatualizado

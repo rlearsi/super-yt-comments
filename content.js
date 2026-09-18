@@ -308,7 +308,6 @@
   function syncLoop() {
     state.rafHandle = requestAnimationFrame(syncLoop);
     if (!state.enabled || !state.videoEl || !state.overlayEl) return;
-    if (state.videoEl.paused && state.lastCheckedSecond !== -1) return;
 
     // Suppress cards briefly after a popup-triggered seek
     if (Date.now() < state.suppressUntil) return;
@@ -365,7 +364,6 @@
 
   function initForVideo(videoId) {
     log('Init for video:', videoId);
-    // NOTE: state.lastVideoId is already set by onNavigate() before this call.
     state.comments    = [];
     state.shownMap.clear();
     state.lastCheckedSecond = -1;
@@ -375,17 +373,18 @@
       state.videoEl = findVideo();
 
       if (!playerReady || !state.videoEl) {
-        if (attempts < 10) setTimeout(() => tryInit(attempts + 1), 600);
+        if (attempts < 25) setTimeout(() => tryInit(attempts + 1), 100);
         return;
       }
       if (state.videoEl) state.videoEl.addEventListener('seeked', handleSeeked);
       startSync();
     };
-    setTimeout(() => tryInit(), 800);
+    tryInit(0); // Imediato sem 800ms de atraso
   }
 
   function teardown() {
     stopSync();
+    document.querySelectorAll('.ytsc-comment-card').forEach(el => el.remove());
     removeOverlay();
     state.comments    = [];
     state.shownMap.clear();
@@ -430,7 +429,7 @@
       _lastHref = location.href;
       onNavigate();
     }
-  }, 500);
+  }, 200);
 
   // ─── Message Bus ──────────────────────────────────────
 
