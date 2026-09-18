@@ -12,175 +12,156 @@
     :root {
       --accent:       #7c5cff;
       --accent-light: #a78bfa;
-      --accent-dim:   rgba(124, 92, 255, 0.18);
-      --accent-border:rgba(124, 92, 255, 0.35);
-      --bg:    #0c0c14;
-      --bg2:   #13131f;
-      --bg3:   #1c1c2e;
-      --bg4:   #23233a;
-      --border:rgba(255,255,255,0.07);
-      --text:  #e2e2f0;
-      --muted: rgba(255,255,255,0.42);
-      --radius:12px;
+      --accent-dim:   rgba(124, 92, 255, 0.15);
+      --accent-border:rgba(124, 92, 255, 0.3);
+      --bg:           #0d0d16;
+      --surface:      rgba(255,255,255,0.04);
+      --divider:      rgba(255,255,255,0.06);
+      --text:         #ddddf0;
+      --muted:        rgba(255,255,255,0.38);
     }
 
     body {
-      width: 360px;
+      width: 340px;
       min-height: 200px;
-      max-height: 560px;
+      max-height: 540px;
       background: var(--bg);
       color: var(--text);
-      font-family: 'Inter', 'Segoe UI', sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       font-size: 13px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
 
-    /* ── Header ─────────────────────────────────── */
+    /* ── Header ──────────────────────────────────── */
     .header {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 14px 16px;
-      background: var(--bg2);
-      border-bottom: 1px solid var(--border);
+      gap: 10px;
+      padding: 14px 16px 12px;
       flex-shrink: 0;
     }
 
     .header-icon {
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
+      width: 28px; height: 28px;
+      border-radius: 7px;
       flex-shrink: 0;
     }
 
     .header-info { flex: 1; min-width: 0; }
 
     .header-info h1 {
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 700;
       color: #fff;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
-    .header-info p {
-      font-size: 10.5px;
+    .header-info .vid-id {
+      font-size: 10px;
       color: var(--muted);
-      margin-top: 2px;
+      margin-top: 1px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     /* Toggle */
-    .toggle-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 3px;
-      flex-shrink: 0;
-    }
-
-    .toggle-wrap span {
-      font-size: 9.5px;
-      color: var(--muted);
-      letter-spacing: 0.3px;
-    }
-
     .toggle {
       position: relative;
-      width: 36px;
-      height: 20px;
+      width: 34px; height: 19px;
       cursor: pointer;
+      flex-shrink: 0;
     }
     .toggle input { display: none; }
 
     .t-track {
-      position: absolute;
-      inset: 0;
-      background: var(--bg4);
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      transition: background 0.22s, border-color 0.22s;
+      position: absolute; inset: 0;
+      background: rgba(255,255,255,0.1);
+      border-radius: 19px;
+      transition: background 0.2s;
     }
-    .toggle input:checked + .t-track {
-      background: var(--accent);
-      border-color: transparent;
-    }
+    .toggle input:checked + .t-track { background: var(--accent); }
 
     .t-thumb {
       position: absolute;
       top: 2px; left: 2px;
-      width: 16px; height: 16px;
+      width: 15px; height: 15px;
       background: #fff;
       border-radius: 50%;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-      transition: left 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      transition: left 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-    .toggle input:checked ~ .t-thumb { left: calc(100% - 18px); }
+    .toggle input:checked ~ .t-thumb { left: calc(100% - 17px); }
 
-    /* ── Status ─────────────────────────────────── */
-    #status-bar {
+    /* ── Status row ───────────────────────────────── */
+    .status-row {
       display: flex;
       align-items: center;
-      gap: 9px;
-      padding: 9px 16px;
-      background: var(--bg2);
-      border-bottom: 1px solid var(--border);
+      gap: 8px;
+      padding: 0 16px 12px;
       flex-shrink: 0;
     }
 
     .dot {
-      width: 7px; height: 7px;
+      width: 6px; height: 6px;
       border-radius: 50%;
-      background: #555;
+      background: rgba(255,255,255,0.2);
       flex-shrink: 0;
       transition: background 0.3s, box-shadow 0.3s;
     }
-    .dot.active  { background: #4ade80; box-shadow: 0 0 7px rgba(74,222,128,0.45); }
-    .dot.inactive{ background: #f87171; }
-    .dot.idle    { background: #fbbf24; }
+    .dot.active   { background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.4); }
+    .dot.inactive { background: #f87171; }
 
-    #status-text { flex: 1; font-size: 11.5px; color: var(--muted); }
+    #status-text {
+      font-size: 11px;
+      color: var(--muted);
+      flex: 1;
+    }
 
     .count-badge {
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 700;
       color: var(--accent-light);
       background: var(--accent-dim);
-      border: 1px solid var(--accent-border);
-      padding: 2px 9px;
+      padding: 2px 8px;
       border-radius: 20px;
-      white-space: nowrap;
     }
 
-    /* ── Settings ───────────────────────────────── */
-    .settings {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      background: var(--bg2);
-      border-bottom: 1px solid var(--border);
+    /* ── Divider ─────────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: var(--divider);
       flex-shrink: 0;
     }
 
-    .settings label {
+    /* ── Settings bar ──────────────────────────────── */
+    .settings {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 16px;
+      flex-shrink: 0;
+    }
+
+    .settings-label {
       font-size: 11px;
       color: var(--muted);
       white-space: nowrap;
     }
 
+    .settings-desc {
+      font-size: 10px;
+      color: rgba(255,255,255,0.2);
+    }
+
     .settings select {
       flex: 1;
-      background: var(--bg3);
+      background: var(--surface);
       color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 4px 10px;
+      border: 1px solid var(--divider);
+      border-radius: 7px;
+      padding: 4px 8px;
       font-size: 11.5px;
       font-family: inherit;
       cursor: pointer;
@@ -189,37 +170,30 @@
     }
     .settings select:focus { border-color: var(--accent-border); }
 
-    /* ── List header ─────────────────────────────── */
-    .list-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 9px 16px 5px;
-      flex-shrink: 0;
-    }
-
-    .list-header-label {
+    /* ── List ─────────────────────────────────────── */
+    .list-label {
+      padding: 8px 16px 4px;
       font-size: 10px;
       font-weight: 600;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 0.9px;
+      letter-spacing: 0.8px;
+      flex-shrink: 0;
     }
 
-    /* ── Comment list ─────────────────────────────── */
     #comment-list {
       flex: 1;
       overflow-y: auto;
-      padding: 0 10px 12px;
+      padding: 0 10px 10px;
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 4px;
     }
 
     #comment-list::-webkit-scrollbar { width: 3px; }
     #comment-list::-webkit-scrollbar-track { background: transparent; }
     #comment-list::-webkit-scrollbar-thumb {
-      background: rgba(124,92,255,0.25);
+      background: rgba(124,92,255,0.2);
       border-radius: 3px;
     }
 
@@ -227,32 +201,27 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 9px 11px;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
+      padding: 8px 10px;
+      background: var(--surface);
+      border-radius: 9px;
       cursor: pointer;
-      transition: background 0.18s, border-color 0.18s, transform 0.15s;
-      text-decoration: none;
+      transition: background 0.15s, transform 0.15s;
+      border: 1px solid transparent;
     }
 
     .c-item:hover {
-      background: var(--bg3);
+      background: rgba(255,255,255,0.07);
       border-color: var(--accent-border);
-      transform: translateX(4px);
+      transform: translateX(3px);
     }
 
-    .c-item:active { transform: translateX(2px); }
-
-    /* Time pill */
     .c-time {
       flex-shrink: 0;
-      min-width: 44px;
+      min-width: 42px;
       text-align: center;
-      padding: 3px 7px;
+      padding: 2px 6px;
       background: var(--accent-dim);
-      border: 1px solid var(--accent-border);
-      border-radius: 20px;
+      border-radius: 6px;
       font-size: 10px;
       font-weight: 700;
       color: var(--accent-light);
@@ -264,14 +233,14 @@
     .c-author {
       font-size: 11px;
       font-weight: 600;
-      color: rgba(255,255,255,0.82);
+      color: rgba(255,255,255,0.78);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .c-text {
-      font-size: 11px;
+      font-size: 10.5px;
       color: var(--muted);
       margin-top: 1px;
       white-space: nowrap;
@@ -281,37 +250,35 @@
 
     .c-arrow {
       flex-shrink: 0;
-      font-size: 13px;
-      color: rgba(255,255,255,0.15);
-      transition: color 0.2s;
+      font-size: 12px;
+      color: rgba(255,255,255,0.12);
+      transition: color 0.15s;
     }
     .c-item:hover .c-arrow { color: var(--accent-light); }
 
-    /* ── Empty state ─────────────────────────────── */
+    /* ── Empty ───────────────────────────────────── */
     .empty {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 9px;
-      padding: 30px 20px;
+      gap: 8px;
+      padding: 28px 20px;
       text-align: center;
     }
-    .empty-icon  { font-size: 34px; opacity: 0.28; }
-    .empty-title { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.45); }
-    .empty-sub   { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+    .empty-icon  { font-size: 30px; opacity: 0.25; }
+    .empty-title { font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.4); }
+    .empty-sub   { font-size: 11px; color: var(--muted); line-height: 1.5; }
 
     /* ── Footer ──────────────────────────────────── */
     .footer {
-      padding: 7px 16px;
+      padding: 8px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: var(--bg2);
-      border-top: 1px solid var(--border);
       flex-shrink: 0;
     }
 
-    .footer-ver { font-size: 10px; color: rgba(255,255,255,0.18); }
+    .footer-ver { font-size: 10px; color: rgba(255,255,255,0.15); }
 
     .footer-btn {
       font-size: 11px;
@@ -321,40 +288,40 @@
       cursor: pointer;
       padding: 0;
       font-family: inherit;
+      opacity: 0.8;
       transition: opacity 0.2s;
     }
-    .footer-btn:hover { opacity: 0.7; }
+    .footer-btn:hover { opacity: 1; }
   </style>
 </head>
 <body>
 
   <!-- Header -->
   <div class="header">
-    <img src="icons/icon48.png" alt="Ícone" class="header-icon" />
+    <img src="icons/icon48.png" alt="" class="header-icon" />
     <div class="header-info">
       <h1>YT Super Comments</h1>
-      <p id="video-label">Nenhum vídeo detectado</p>
+      <p class="vid-id" id="video-label">Nenhum vídeo ativo</p>
     </div>
-    <div class="toggle-wrap">
-      <span>Ativo</span>
-      <label class="toggle" title="Ativar / Desativar">
-        <input type="checkbox" id="enable-toggle" checked />
-        <div class="t-track"></div>
-        <div class="t-thumb"></div>
-      </label>
-    </div>
+    <label class="toggle" title="Ativar / desativar">
+      <input type="checkbox" id="enable-toggle" checked />
+      <div class="t-track"></div>
+      <div class="t-thumb"></div>
+    </label>
   </div>
 
-  <!-- Status bar -->
-  <div id="status-bar">
-    <div class="dot idle" id="status-dot"></div>
-    <span id="status-text">Aguardando vídeo...</span>
-    <span class="count-badge" id="comment-count">0 comentários</span>
+  <!-- Status -->
+  <div class="status-row">
+    <div class="dot" id="status-dot"></div>
+    <span id="status-text">Abra um vídeo do YouTube</span>
+    <span class="count-badge" id="comment-count">0</span>
   </div>
+
+  <div class="divider"></div>
 
   <!-- Settings -->
   <div class="settings">
-    <label for="dur">⏱ Duração:</label>
+    <span class="settings-label">Comentário fica visível:</span>
     <select id="dur">
       <option value="4000">4 segundos</option>
       <option value="6000" selected>6 segundos</option>
@@ -364,21 +331,20 @@
     </select>
   </div>
 
-  <!-- List -->
-  <div class="list-header">
-    <span class="list-header-label">Comentários com timestamps</span>
-  </div>
+  <div class="divider"></div>
+
+  <div class="list-label">Comentários com timestamps</div>
   <div id="comment-list">
     <div class="empty">
       <div class="empty-icon">💬</div>
-      <div class="empty-title">Nenhum comentário encontrado</div>
-      <div class="empty-sub">Abra um vídeo do YouTube e aguarde<br>os comentários serem carregados.</div>
+      <div class="empty-title">Nenhum encontrado</div>
+      <div class="empty-sub">Abra um vídeo do YouTube.<br>Os comentários serão carregados automaticamente.</div>
     </div>
   </div>
 
   <!-- Footer -->
   <div class="footer">
-    <span class="footer-ver">v1.3.0</span>
+    <span class="footer-ver">v1.4.0</span>
     <button class="footer-btn" id="refresh-btn">↻ Atualizar</button>
   </div>
 

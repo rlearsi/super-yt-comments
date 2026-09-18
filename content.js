@@ -28,6 +28,8 @@
     overlayEl: null,
     rafHandle: null,
     lastCheckedSecond: -1,
+    suppressUntil: 0,         // epoch ms — skip showing cards until this time (popup seek)
+    seekFromPopup: false,     // flag to distinguish popup seek from user scrub
   };
 
   // ─── Debug ────────────────────────────────────────────
@@ -168,9 +170,10 @@
   function showComment(comment) {
     if (!state.overlayEl || !state.enabled) return;
 
-    // Evict oldest card if at limit
-    const visible = state.overlayEl.querySelectorAll('.ytsc-comment-card:not(.ytsc-fadeout)');
-    if (visible.length >= CONFIG.maxVisibleCards) dismissCard(visible[0]);
+    // Evict oldest NON-paused card if at limit
+    const all = [...state.overlayEl.querySelectorAll('.ytsc-comment-card:not(.ytsc-fadeout)')];
+    const nonPaused = all.filter(c => !c.classList.contains('ytsc-paused') && !c.classList.contains('ytsc-expanded'));
+    if (all.length >= CONFIG.maxVisibleCards && nonPaused.length > 0) dismissCard(nonPaused[0]);
 
     // Card
     const card = document.createElement('div');
@@ -203,43 +206,83 @@
     badge.className = 'ytsc-timestamp-badge';
     badge.textContent = comment.formatted;
 
+    const expandHint = document.createElement('span');
+    expandHint.className = 'ytsc-expand-hint';
+    expandHint.textContent = '↔';
+
+    const pauseIcon = document.createElement('span');
+    pauseIcon.className = 'ytsc-pause-icon';
+    pauseIcon.textContent = '⏸';
+
     header.appendChild(authorEl);
     header.appendChild(badge);
+    header.appendChild(expandHint);
 
     const textEl = document.createElement('div');
     textEl.className = 'ytsc-text';
     textEl.innerHTML = highlightText(comment.text);
 
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'ytsc-close-btn';
+    closeBtn.textContent = '✕ fechar';
+
     content.appendChild(header);
     content.appendChild(textEl);
+    content.appendChild(closeBtn);
 
-    // Progress bar
-    if (CONFIG.progressBarEnabled) {
-      const pw = document.createElement('div');
-      pw.className = 'ytsc-progress';
-      const pb = document.createElement('div');
-      pb.className = 'ytsc-progress-bar';
-      pb.style.transition = `transform ${CONFIG.displayDuration}ms linear`;
-      pw.appendChild(pb);
-      content.appendChild(pw);
-      // Start shrink on next frame
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        pb.style.transform = 'scaleX(0)';
-      }));
-    }
+    // Progress bar (animation-based so it can be CSS-paused)
+    const pw = document.createElement('div');
+    pw.className = 'ytsc-progress';
+    const pb = document.createElement('div');
+    pb.className = 'ytsc-progress-bar';
+    pw.appendChild(pb);
+    content.appendChild(pw);
 
+    card.appendChild(pauseIcon);
     card.appendChild(avatarEl);
     card.appendChild(content);
     state.overlayEl.appendChild(card);
 
-    // Auto-dismiss
-    const timer = setTimeout(() => dismissCard(card), CONFIG.displayDuration);
-    card._ytscTimer = timer;
+    // Set animation duration on progress bar
+    pb.style.animationDuration = `${CONFIG.displayDuration}ms`;
 
-    // Click to seek
-    card.addEventListener('click', () => {
-      if (state.videoEl) state.videoEl.currentTime = comment.seconds;
-      clearTimeout(timer);
+    // Track timing for hover-pause
+    card._ytscShownAt  = Date.now();
+    card._ytscDuration = CONFIG.displayDuration;
+    card._ytscTimer    = setTimeout(() => dismissCard(card), CONFIG.displayDuration);
+
+    // ── Hover: pause card (timer + progress bar) ──────────
+    card.addEventListener('mouseenter', () => {
+      if (card.classList.contains('ytsc-expanded')) return; // already pinned
+      const elapsed   = Date.now() - card._ytscShownAt;
+      card._ytscRemaining = Math.max(600, card._ytscDuration - elapsed);
+      clearTimeout(card._ytscTimer);
+      card.classList.add('ytsc-paused'); // CSS pauses the progress animation
+    });
+
+    card.addEventListener('mouseleave', () => {
+      if (card.classList.contains('ytsc-expanded')) return; // stay pinned
+      card.classList.remove('ytsc-paused');
+      // Restart timer with remaining time
+      card._ytscShownAt  = Date.now();
+      card._ytscDuration = card._ytscRemaining;
+      card._ytscTimer    = setTimeout(() => dismissCard(card), card._ytscRemaining);
+      // Resume progress bar from ~current position
+      pb.style.animationDuration = `${card._ytscRemaining}ms`;
+    });
+
+    // ── Click: expand card (show full text) ───────────────
+    card.addEventListener('click', (e) => {
+      if (e.target === closeBtn) return; // handled by closeBtn
+      if (card.classList.contains('ytsc-expanded')) return;
+      // Expand
+      clearTimeout(card._ytscTimer);
+      card.classList.remove('ytsc-paused');
+      card.classList.add('ytsc-expanded');
+    });
+
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       dismissCard(card);
     });
   }
@@ -248,7 +291,7 @@
     if (!card || card.classList.contains('ytsc-fadeout')) return;
     clearTimeout(card._ytscTimer);
     card.classList.add('ytsc-fadeout');
-    setTimeout(() => card.remove(), 750);
+    setTimeout(() => card.remove(), 600);
   }
 
   // ─── Sync Loop ────────────────────────────────────────
@@ -257,6 +300,9 @@
     state.rafHandle = requestAnimationFrame(syncLoop);
     if (!state.enabled || !state.videoEl || !state.overlayEl) return;
     if (state.videoEl.paused && state.lastCheckedSecond !== -1) return;
+
+    // Suppress cards briefly after a popup-triggered seek
+    if (Date.now() < state.suppressUntil) return;
 
     const currentSecond = Math.floor(state.videoEl.currentTime);
     if (currentSecond === state.lastCheckedSecond) return;
@@ -273,6 +319,14 @@
   }
 
   function handleSeeked() {
+    if (state.seekFromPopup) {
+      // Popup-triggered seek: keep shownMap intact, just suppress new cards briefly
+      state.seekFromPopup  = false;
+      state.suppressUntil  = Date.now() + 2500;
+      state.lastCheckedSecond = -1;
+      return;
+    }
+    // Normal user scrub: reset everything
     state.shownMap.clear();
     state.lastCheckedSecond = -1;
   }
@@ -396,7 +450,10 @@
     }
 
     if (msg.type === 'SEEK_TO') {
-      if (state.videoEl) state.videoEl.currentTime = msg.seconds;
+      if (state.videoEl) {
+        state.seekFromPopup = true;  // flag so handleSeeked knows this came from popup
+        state.videoEl.currentTime = msg.seconds;
+      }
       sendResponse({ ok: true });
       return true;
     }
@@ -416,5 +473,5 @@
   });
 
   onNavigate();
-  log('Content script loaded (v1.1).');
+  log('Content script loaded (v1.4).');
 })();
