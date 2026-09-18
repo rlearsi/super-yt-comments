@@ -1,5 +1,29 @@
 ## YouTube Super Comments - ChangeLog
 
+### v1.3.0 — 2026-09-18
+- Corrigido bug de fetch duplicado: debounce + rastreamento por video ID evitam chamadas duplas à API
+- Limite de páginas aumentado de 10 para 50 (~1000 comentários por vídeo)
+- Redesign completo do popup e overlay: paleta Indigo/Violeta (#7c5cff) mais profissional
+- Tipografia atualizada para fonte Inter (Google Fonts)
+- Fundo navy escuro (#0c0c14) com superfícies em camadas para melhor hierarquia visual
+- Badges de timestamp redesenhados: pills violeta suaves com borda translúcida
+- Animação de hover nos cards do popup com deslocamento lateral suave
+
+### v1.2.0 — 2026-09-18
+- Substituição completa do DOM scraping por chamada direta à InnerTube API (/youtubei/v1/next)
+- Criado injected.js (world: MAIN) para acesso ao contexto da página (window.ytInitialData, fetch, XHR)
+- Extração robusta do token de comentários com 3 caminhos de busca em ytInitialData
+- Loop de polling (até 10s) para aguardar ytInitialData estar disponível
+- Interceptação passiva de fetch e XHR para capturar comentários carregados organicamente
+- Uso de _origFetch para chamadas proativas (evita loop infinito no interceptor)
+- Logs detalhados no console (prefixo [YTSuperComments]) para diagnóstico
+- content.js simplificado: removido DOM scanner, adicionado listener de postMessage
+
+### v1.1.0 — 2026-09-18
+- Arquitetura refatorada: injected.js (world: MAIN) + content.js (world: ISOLATED)
+- manifest.json atualizado para Manifest V3 com dois content scripts
+- Comunicação entre mundos via window.postMessage
+
 ### v1.0.0 — 2026-09-18
 - Versão inicial da extensão
 - Detecção automática de comentários com timestamps no DOM do YouTube
