@@ -14,10 +14,10 @@
 (function () {
   'use strict';
 
-  const TAG      = '[YTSuperComments]';
-  const SOURCE   = 'yt-super-comments-injected';
-  const MAX_PAGES = 10;   // páginas de comentários para buscar proativamente
-  const PAGE_DELAY = 400; // ms entre páginas
+  const TAG       = '[YTSuperComments]';
+  const SOURCE    = 'yt-super-comments-injected';
+  const MAX_PAGES  = 50;   // páginas (~1000 comentários)
+  const PAGE_DELAY = 300; // ms entre páginas
 
   // ─── InnerTube helpers ────────────────────────────────
 
@@ -353,7 +353,7 @@
         if (token && page < MAX_PAGES) await sleep(PAGE_DELAY);
       }
 
-      console.log(TAG, `Proativo concluído: ${page} pág(s), ${totalComments} comentários com timestamp.`);
+      console.log(TAG, `Proativo concluído: ${page} pág(s), ${totalComments} comentários no total.`);
     } catch (e) {
       console.error(TAG, 'Erro no fetch proativo:', e);
     } finally {
@@ -362,20 +362,42 @@
   }
 
   // ─── Navigation ───────────────────────────────────────
+  // Controla qual vídeo já foi (ou está sendo) buscado para
+  // evitar disparar fetchCommentsPro() duas vezes no mesmo vídeo.
+
+  let _lastFetchedVideoId = null;
+  let _navTimer = null;
+
+  function getVideoId() {
+    try { return new URL(location.href).searchParams.get('v'); } catch { return null; }
+  }
 
   function onNavigate() {
     if (!location.href.includes('youtube.com/watch')) return;
-    _fetching = false;
-    fetchCommentsPro();
+
+    // Debounce: aguarda 200ms para descartar eventos duplicados
+    clearTimeout(_navTimer);
+    _navTimer = setTimeout(() => {
+      const vid = getVideoId();
+      if (!vid) return;
+      if (vid === _lastFetchedVideoId && _fetching) {
+        console.log(TAG, `Vídeo ${vid} já está sendo buscado — ignorando duplicata.`);
+        return;
+      }
+      _lastFetchedVideoId = vid;
+      _fetching = false; // reseta para novo vídeo
+      fetchCommentsPro();
+    }, 200);
   }
 
   document.addEventListener('yt-navigate-finish', onNavigate);
 
+  // Disparo inicial (quando a extensão é carregada com o vídeo já aberto)
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', onNavigate);
+    document.addEventListener('DOMContentLoaded', () => setTimeout(onNavigate, 100));
   } else {
-    onNavigate();
+    setTimeout(onNavigate, 100);
   }
 
-  console.log(TAG, 'Injected script carregado (v1.2).');
+  console.log(TAG, 'Injected script carregado (v1.3).');
 })();

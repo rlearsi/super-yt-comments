@@ -1,118 +1,91 @@
 /* =====================================================
-   YouTube Super Comments - Popup Script
+   YouTube Super Comments - Popup Script v1.3
    ===================================================== */
 
 (function () {
   'use strict';
 
-  const toggleEl      = document.getElementById('enable-toggle');
-  const statusDot     = document.getElementById('status-dot');
-  const statusText    = document.getElementById('status-text');
-  const commentCount  = document.getElementById('comment-count');
-  const commentList   = document.getElementById('comment-list');
-  const videoLabel    = document.getElementById('video-label');
-  const durationSel   = document.getElementById('duration-select');
-  const refreshBtn    = document.getElementById('refresh-btn');
+  const toggleEl     = document.getElementById('enable-toggle');
+  const statusDot    = document.getElementById('status-dot');
+  const statusText   = document.getElementById('status-text');
+  const commentCount = document.getElementById('comment-count');
+  const commentList  = document.getElementById('comment-list');
+  const videoLabel   = document.getElementById('video-label');
+  const durSel       = document.getElementById('dur');
+  const refreshBtn   = document.getElementById('refresh-btn');
 
-  /**
-   * Queries the active YouTube tab's content script for current status.
-   */
   async function getStatus() {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab || !tab.url || !tab.url.includes('youtube.com/watch')) {
-        setNotOnVideo();
-        return;
-      }
+      if (!tab?.url?.includes('youtube.com/watch')) { setIdle(); return; }
 
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_STATUS' });
-      if (!response) {
-        setNotOnVideo();
-        return;
-      }
+      const resp = await chrome.tabs.sendMessage(tab.id, { type: 'GET_STATUS' }).catch(() => null);
+      if (!resp) { setIdle(); return; }
 
-      // Update toggle state
-      toggleEl.checked = response.enabled;
+      toggleEl.checked = resp.enabled;
 
-      // Update status
-      if (response.videoId) {
-        videoLabel.textContent = `ID: ${response.videoId}`;
-        statusDot.className = `status-dot ${response.enabled ? 'active' : 'inactive'}`;
-        statusText.textContent = response.enabled
+      if (resp.videoId) {
+        videoLabel.textContent = `ID: ${resp.videoId}`;
+        statusDot.className   = `dot ${resp.enabled ? 'active' : 'inactive'}`;
+        statusText.textContent = resp.enabled
           ? 'Extensão ativa — monitorando comentários'
           : 'Extensão pausada';
       } else {
-        setNotOnVideo();
-        return;
+        setIdle(); return;
       }
 
-      // Update count
-      const count = response.commentCount || 0;
-      commentCount.textContent = `${count} comentário${count !== 1 ? 's' : ''}`;
+      const n = resp.commentCount || 0;
+      commentCount.textContent = `${n} comentário${n !== 1 ? 's' : ''}`;
+      renderList(resp.comments || [], tab.id);
 
-      // Render comment list
-      renderComments(response.comments || [], tab.id);
-
-      // Restore saved duration setting
-      chrome.storage.local.get(['displayDuration'], (result) => {
-        if (result.displayDuration) {
-          durationSel.value = String(result.displayDuration);
-        }
+      chrome.storage.local.get(['displayDuration'], r => {
+        if (r.displayDuration) durSel.value = String(r.displayDuration);
       });
-
-    } catch (err) {
-      setNotOnVideo();
+    } catch {
+      setIdle();
     }
   }
 
-  function setNotOnVideo() {
-    statusDot.className = 'status-dot idle';
+  function setIdle() {
+    statusDot.className    = 'dot idle';
     statusText.textContent = 'Abra um vídeo do YouTube';
     videoLabel.textContent = 'Nenhum vídeo detectado';
     commentCount.textContent = '0 comentários';
-    renderComments([], null);
+    renderList([], null);
   }
 
-  /**
-   * Renders the list of timestamp comments in the popup.
-   */
-  function renderComments(comments, tabId) {
-    if (!comments || comments.length === 0) {
+  function renderList(comments, tabId) {
+    if (!comments?.length) {
       commentList.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">💬</div>
-          <div class="empty-state-title">Nenhum comentário encontrado</div>
-          <div class="empty-state-subtitle">Abra um vídeo do YouTube e aguarde os<br>comentários carregarem na página.</div>
-        </div>
-      `;
+        <div class="empty">
+          <div class="empty-icon">💬</div>
+          <div class="empty-title">Nenhum comentário encontrado</div>
+          <div class="empty-sub">Abra um vídeo do YouTube e aguarde<br>os comentários serem carregados.</div>
+        </div>`;
       return;
     }
 
-    // Sort by timestamp ascending
     const sorted = [...comments].sort((a, b) => a.seconds - b.seconds);
-
     commentList.innerHTML = '';
+
     sorted.forEach(c => {
       const item = document.createElement('div');
-      item.className = 'comment-item';
+      item.className = 'c-item';
       item.title = `Ir para ${c.formatted} no vídeo`;
-
       item.innerHTML = `
-        <span class="item-badge">⏱ ${c.formatted}</span>
-        <div class="item-content">
-          <div class="item-author">${escapeHtml(c.author)}</div>
-          <div class="item-text">${escapeHtml(c.text)}</div>
+        <span class="c-time">⏱ ${esc(c.formatted)}</span>
+        <div class="c-body">
+          <div class="c-author">${esc(c.author)}</div>
+          <div class="c-text">${esc(c.text)}</div>
         </div>
-        <span class="item-arrow">›</span>
+        <span class="c-arrow">›</span>
       `;
 
-      // Click to seek video to timestamp
       item.addEventListener('click', async () => {
         if (!tabId) return;
         try {
           await chrome.tabs.sendMessage(tabId, { type: 'SEEK_TO', seconds: c.seconds });
-          // Visually indicate click
-          item.style.borderColor = 'rgba(255,60,60,0.6)';
+          item.style.borderColor = 'rgba(124,92,255,0.7)';
           setTimeout(() => { item.style.borderColor = ''; }, 800);
         } catch {}
       });
@@ -121,49 +94,36 @@
     });
   }
 
-  function escapeHtml(str) {
-    return (str || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+  function esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // ─── Event Listeners ──────────────────────────────────
+  // ── Events ──────────────────────────────────────────
 
-  // Enable/Disable toggle
   toggleEl.addEventListener('change', async () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab) return;
       await chrome.tabs.sendMessage(tab.id, { type: 'SET_ENABLED', value: toggleEl.checked });
-
-      statusDot.className = `status-dot ${toggleEl.checked ? 'active' : 'inactive'}`;
+      statusDot.className    = `dot ${toggleEl.checked ? 'active' : 'inactive'}`;
       statusText.textContent = toggleEl.checked
         ? 'Extensão ativa — monitorando comentários'
         : 'Extensão pausada';
     } catch {}
   });
 
-  // Duration change
-  durationSel.addEventListener('change', async () => {
-    const val = parseInt(durationSel.value, 10);
+  durSel.addEventListener('change', async () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab) return;
-      await chrome.tabs.sendMessage(tab.id, { type: 'SET_DURATION', value: val });
+      await chrome.tabs.sendMessage(tab.id, { type: 'SET_DURATION', value: parseInt(durSel.value, 10) });
     } catch {}
   });
 
-  // Refresh button
   refreshBtn.addEventListener('click', () => {
     refreshBtn.textContent = '↻ Atualizando...';
-    getStatus().finally(() => {
-      setTimeout(() => { refreshBtn.textContent = '↻ Atualizar'; }, 800);
-    });
+    getStatus().finally(() => setTimeout(() => { refreshBtn.textContent = '↻ Atualizar'; }, 700));
   });
 
-  // ─── Init ─────────────────────────────────────────────
   getStatus();
-
 })();
