@@ -1,101 +1,105 @@
-# YouTube Super Comments 💬▶️
+# Super YouTube Comments 💬▶️
 
-Extensão para o Google Chrome que detecta comentários do YouTube contendo timestamps (ex: `2:24`, `01:15:30`) e os exibe diretamente sobre o player de vídeo no exato momento citado.
-
----
-
-## ✨ Funcionalidades
-
-- 🔍 **Detecção automática** de comentários com timestamps (formatos: `M:SS`, `MM:SS`, `H:MM:SS`)
-- 🎬 **Overlay dentro do player** — aparece no canto inferior esquerdo, inclusive em tela cheia
-- 🎨 **Design Glassmorphism** com foto do autor, nome, badge de tempo e texto do comentário
-- 🚀 **Animação Pop-in** com efeito de salto elástico ao entrar
-- 🌫️ **Fade-out suave** após o tempo configurável (4s a 20s)
-- ⏩ **Barra de progresso** visual no card indicando quanto tempo ele ainda ficará visível
-- 📋 **Popup da extensão** listando todos os timestamps encontrados (clique para pular ao momento)
-- ⏯️ **Toggle** para ativar/desativar a extensão sem recarregar a página
-- 🔄 **Compatível com SPA do YouTube** — funciona ao navegar entre vídeos sem recarregar
+Google Chrome extension that proactively detects YouTube comments containing timestamps (e.g. `2:24`, `01:15:30`) and renders them directly over the video player at the exact moment mentioned.
 
 ---
 
-## 📦 Como Instalar (Modo Desenvolvedor)
+## ✨ Features
 
-> A extensão ainda não está publicada na Chrome Web Store. Siga os passos abaixo para carregá-la localmente.
+- 🔍 **Proactive Comment Detection** — Automatically fetches and scans video comments in the background using YouTube's InnerTube API. **No need to scroll down** to load comments!
+- 📄 **Deep Pagination** — Paginates through comment batches to capture timestamps across the entire video.
+- 🎬 **In-Player Overlay** — Seamlessly embedded in the bottom-left corner of the video player, fully visible in theater and full-screen modes.
+- 🎨 **Glassmorphism UI** — Sleek modern card showing author avatar, channel name, clickable timestamp badge, and comment body.
+- 🚀 **Smooth Animations** — Fluid elastic pop-in transition with a configurable display duration (4s to 20s).
+- ⏳ **Visual Progress Bar** — Displays remaining display time directly on the card.
+- ⏸️ **Interactive Overlays** — Hover over a card to pause the countdown timer, click to expand lengthy comments, or close early via the dismiss button.
+- 📋 **Extension Popup** — View a comprehensive list of all discovered timestamps; click any timestamp to jump directly to that moment.
+- ⏯️ **Instant Toggle** — Easily enable or disable overlays on the fly without refreshing the page.
+- 🔄 **YouTube SPA Compatibility** — Accurately detects YouTube's single-page application (SPA) navigation, clearing stale overlays and immediately fetching timestamps for new videos.
 
-### Pré-requisitos
-- Google Chrome (versão 114 ou superior recomendada)
+---
 
-### Passo a Passo
+## 📦 How to Install (Developer Mode)
 
-1. **Abra o Google Chrome** e navegue para:
+> This extension is loaded locally as an unpacked extension. Follow the instructions below to install it.
+
+### Prerequisites
+- Google Chrome (version 114 or higher recommended) or any Chromium-based browser (Brave, Edge, Opera, etc.)
+
+### Step-by-Step Installation
+
+1. Open **Google Chrome** and navigate to:
    ```
    chrome://extensions
    ```
 
-2. **Ative o Modo do Desenvolvedor** — clique no toggle no canto superior direito da página.
+2. Enable **Developer mode** using the toggle switch in the top-right corner.
 
-3. **Clique em "Carregar sem compactação"** (*Load unpacked*).
+3. Click the **Load unpacked** button in the top-left corner.
 
-4. **Selecione a pasta** do projeto:
+4. Select the project directory:
    ```
    /opt/lampp/htdocs/super-yt-comments/
    ```
 
-5. A extensão aparecerá na lista com o ícone 🎬💬. **Pronto!**
+5. The extension will now appear in your extensions list with the 🎬💬 icon. **You're all set!**
 
 ---
 
-## 🚀 Como Usar
+## 🚀 How to Use
 
-1. Acesse [youtube.com](https://www.youtube.com) e abra qualquer vídeo.
-2. Role a página para baixo e aguarde os comentários carregarem.
-3. Os comentários com timestamps detectados aparecerão automaticamente no player no momento citado.
-4. Clique no **ícone da extensão** na barra do Chrome para ver a lista de timestamps e clicar para pular direto para o momento.
+1. Go to [youtube.com](https://www.youtube.com) and open any video.
+2. The extension automatically fetches and indexes comments in the background — you **do not** need to scroll down to load them.
+3. When the video playback reaches any timestamp mentioned in a comment, the card will automatically appear over the player.
+4. Click the **Super YouTube Comments** icon in your browser toolbar to see all detected timestamps and jump directly to any highlighted moment.
 
 ---
 
-## ⚙️ Configurações (via Popup)
+## ⚙️ Configuration (via Popup)
 
-| Opção | Descrição |
+| Option | Description |
 |:---|:---|
-| **Ativo / Inativo** | Toggle para ativar/desativar os overlays |
-| **Duração** | Tempo que cada card permanece visível (4s – 20s) |
-| **Lista de timestamps** | Clique num item para pular ao momento do vídeo |
-| **↻ Atualizar** | Força uma nova varredura dos comentários carregados |
+| **Enable / Disable** | Toggle overlay visibility on or off without reloading the page |
+| **Duration** | Adjust how long each card stays on screen (4s – 20s) |
+| **Timestamp Directory** | Click any timestamp in the list to jump instantly to that moment in the video |
+| **↻ Refresh** | Manually force a re-fetch and scan of the current video's comments |
 
 ---
 
-## 🗂️ Estrutura de Arquivos
+## 🗂️ Project Structure
 
 ```
 super-yt-comments/
-├── manifest.json        ← Configuração da extensão (Manifest V3)
-├── content.js           ← Script injetado nas páginas do YouTube
-├── styles.css           ← Estilos do overlay e animações
-├── popup.html           ← Interface do popup
-├── popup.js             ← Lógica do popup
-├── icons/
+├── manifest.json        ← Extension configuration (Manifest V3)
+├── injected.js          ← Main-world script for proactive InnerTube API comment fetching
+├── content.js           ← Content script managing player overlays, timing, and UI
+├── styles.css           ← Overlay styling, animations, and glassmorphism themes
+├── popup.html           ← Extension popup interface
+├── popup.js             ← Popup logic and timestamp directory navigation
+├── icons/               ← Extension icons (16px, 48px, 128px)
 │   ├── icon16.png
 │   ├── icon48.png
 │   └── icon128.png
-└── README.md
+├── ChangeLog.txt        ← Version release notes and update history
+└── README.md            ← Project documentation
 ```
 
 ---
 
-## 🔧 Notas Técnicas
+## 🔧 Technical Details
 
-- Utiliza **Manifest V3** (padrão atual do Chrome).
-- Não requer permissões de rede externas — toda a coleta de dados é feita diretamente do DOM da página.
-- Compatível com o layout de comentários **clássico** (`ytd-comment-renderer`) e **novo** (`ytd-comment-view-model`).
-- O overlay é injetado dentro do elemento `.html5-video-player` para garantir visibilidade em modo tela cheia.
+- Built with **Chrome Manifest V3** standards.
+- Employs a dual-layer script architecture:
+  - `injected.js` operates in the page's `MAIN` world to communicate directly with YouTube's internal `ytcfg` context and proactively fetch comment continuations via the same-origin InnerTube API.
+  - `content.js` runs in the `ISOLATED` world, synchronizing playback time, listening for video navigations, and injecting UI elements.
+- Overlays are injected directly into YouTube's `.html5-video-player` container to ensure persistence across windowed, theater, and fullscreen view modes.
 
 ---
 
 ## 📝 Changelog
 
-Veja [ChangeLog.txt](ChangeLog.txt).
+See [ChangeLog.txt](ChangeLog.txt) for version history and release notes.
 
 ---
 
-*Desenvolvido com ❤️ — Super YouTube Comments v1.0.0*
+*Built with ❤️ — Super YouTube Comments v1.6.3*
