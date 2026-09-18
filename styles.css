@@ -1,0 +1,209 @@
+/* =====================================================
+   YouTube Super Comments - Overlay Styles
+   Glassmorphism design with pop-in & fade-out animation
+   ===================================================== */
+
+/* --- Overlay Container --- */
+#ytsc-overlay {
+  position: absolute;
+  bottom: 70px;
+  left: 24px;
+  z-index: 2147483640;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  max-width: 420px;
+  pointer-events: none;
+  font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+}
+
+/* --- Comment Card --- */
+.ytsc-comment-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px 12px 12px;
+  border-radius: 16px;
+  background: rgba(15, 15, 15, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  max-width: 420px;
+  pointer-events: auto;
+  cursor: default;
+  will-change: transform, opacity;
+
+  /* --- Pop-in Entry Animation --- */
+  animation: ytsc-popin 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Pop-In Keyframes — elastic spring bounce */
+@keyframes ytsc-popin {
+  0% {
+    opacity: 0;
+    transform: translateX(-32px) scale(0.75);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(4px) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Fade-Out State (toggled via JS) */
+.ytsc-comment-card.ytsc-fadeout {
+  animation: ytsc-fadeout 0.7s cubic-bezier(0.4, 0, 0.6, 1) forwards !important;
+}
+
+@keyframes ytsc-fadeout {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-20px) scale(0.85);
+  }
+}
+
+/* --- Avatar --- */
+.ytsc-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 60, 60, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 60, 60, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Avatar Fallback (initials) */
+.ytsc-avatar-fallback {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff3c3c 0%, #c50000 100%);
+  border: 2px solid rgba(255, 60, 60, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* --- Content Area --- */
+.ytsc-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* --- Header Row --- */
+.ytsc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ytsc-author {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+/* Timestamp Badge */
+.ytsc-timestamp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255, 60, 60, 0.85) 0%, rgba(180, 0, 0, 0.85) 100%);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(255, 60, 60, 0.4);
+}
+
+.ytsc-timestamp-badge::before {
+  content: '⏱';
+  font-size: 10px;
+}
+
+/* --- Comment Text --- */
+.ytsc-text {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  /* Limit to 3 lines */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Highlighted timestamps within the text */
+.ytsc-text .ytsc-ts-highlight {
+  color: #ff6b6b;
+  font-weight: 600;
+  background: rgba(255, 60, 60, 0.15);
+  padding: 0px 3px;
+  border-radius: 3px;
+}
+
+/* --- Progress Bar (time remaining) --- */
+.ytsc-progress {
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.ytsc-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ff3c3c, #ff8c8c);
+  border-radius: 2px;
+  transform-origin: left;
+  transition: transform linear;
+}
+
+/* --- Fullscreen Mode Compatibility --- */
+.html5-video-player:-webkit-full-screen #ytsc-overlay,
+.html5-video-player:fullscreen #ytsc-overlay {
+  bottom: 80px;
+  left: 28px;
+}
+
+/* Ensure overlay is visible over YouTube's fullscreen controls */
+:-webkit-full-screen #ytsc-overlay {
+  z-index: 2147483647;
+}
+
+:fullscreen #ytsc-overlay {
+  z-index: 2147483647;
+}

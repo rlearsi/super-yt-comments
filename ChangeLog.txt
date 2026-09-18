@@ -1,0 +1,14 @@
+## YouTube Super Comments - ChangeLog
+
+### v1.0.0 — 2026-09-18
+- Versão inicial da extensão
+- Detecção automática de comentários com timestamps no DOM do YouTube
+- Overlay dentro do player com glassmorphism, animação pop-in elástico e fade-out suave
+- Suporte a formatos M:SS, MM:SS e H:MM:SS
+- Sincronização em tempo real com currentTime do vídeo
+- Popup com lista de timestamps clicáveis e toggle de ativação
+- Seletor de duração de exibição dos cards (4s - 20s)
+- Compatibilidade com SPA navigation do YouTube
+- Suporte a tela cheia, modo teatro e modo normal
+- Barra de progresso visual em cada card de comentário
+- MutationObserver para detecção em tempo real conforme comentários carregam
