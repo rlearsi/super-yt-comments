@@ -7,6 +7,8 @@
       - Extrai o token de comentários de ytInitialData OU
       - Consulta diretamente /youtubei/v1/next com videoId para obter
         o token atualizado mesmo em navegações SPA (sem recarregar página).
+      - Utiliza caminhos relativos (/youtubei/v1/next) com credentials: 'same-origin'
+        para evitar bloqueios de CORS em qualquer domínio (youtube.com / www.youtube.com).
       - Busca até 50 páginas de comentários em segundo plano.
       - Armazena comentários em cache por videoId e responde
         imediatamente a requisições do content.js (evita perda de mensagens).
@@ -23,6 +25,11 @@
   const MAX_PAGES   = 50;   // páginas (~1000 comentários)
   const PAGE_DELAY  = 250;  // ms entre páginas
   const MAX_CACHE_VIDEOS = 10;
+
+  // Garante referência nativa e vinculada ao window desde o início do script
+  const _origFetch = window.fetch ? window.fetch.bind(window) : null;
+  const _origOpen  = XMLHttpRequest.prototype.open;
+  const _origSend  = XMLHttpRequest.prototype.send;
 
   // Cache de comentários por videoId: videoId -> Array<comment>
   const _videoComments = new Map();
@@ -53,16 +60,6 @@
     }
   }
 
-  async function waitForApiKey(maxWaitMs = 6000) {
-    const start = Date.now();
-    while (Date.now() - start < maxWaitMs) {
-      const key = getApiKey();
-      if (key) return key;
-      await sleep(200);
-    }
-    return getApiKey();
-  }
-
   function getClientCtx() {
     try {
       const cfg = window.ytcfg?.get?.('INNERTUBE_CONTEXT')?.client;
@@ -77,6 +74,33 @@
     } catch {
       return { clientName: 'WEB', clientVersion: '2.20240918.00.00', hl: 'pt', gl: 'BR' };
     }
+  }
+
+  /**
+   * Chamada segura para a InnerTube API do YouTube.
+   * Utiliza URL relativa para garantir que seja same-origin (sem erro de CORS),
+   * credenciais de mesma origem e headers padrão do cliente YouTube.
+   */
+  async function callInnerTubeApi(body) {
+    const client = getClientCtx();
+    const apiKey = getApiKey();
+    const url = '/youtubei/v1/next?prettyPrint=false' + (apiKey ? `&key=${encodeURIComponent(apiKey)}` : '');
+
+    const fetchFn = _origFetch || window.fetch.bind(window);
+    return fetchFn(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-YouTube-Client-Name': '1',
+        'X-YouTube-Client-Version': client.clientVersion || '2.20240918.00.00',
+        'X-YTSC-Internal': '1',
+      },
+      body: JSON.stringify({
+        context: { client },
+        ...body,
+      }),
+    });
   }
 
   // ─── Token extractors ─────────────────────────────────
@@ -320,7 +344,7 @@
 
   // ─── Proactive Fetch ──────────────────────────────────
 
-  async function getOrFetchCommentToken(videoId, apiKey, client) {
+  async function getOrFetchCommentToken(videoId) {
     // 1. Tenta extrair de ytInitialData se for do mesmo vídeo
     try {
       const initData = window.ytInitialData;
@@ -338,36 +362,26 @@
     // busca watch data diretamente da InnerTube API para este videoId
     console.log(TAG, `Buscando watch data via API para o vídeo ${videoId}...`);
     try {
-      const res = await _origFetch(`https://www.youtube.com/youtubei/v1/next?key=${apiKey}&prettyPrint=false`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context: { client },
-          videoId: videoId,
-        }),
-      });
-
-      if (res.ok) {
+      const res = await callInnerTubeApi({ videoId });
+      if (res && res.ok) {
         const watchData = await res.json();
         const token = extractCommentToken(watchData);
         if (token) {
           console.log(TAG, `Token obtido com sucesso via API para ${videoId}`);
           return token;
         }
-      } else {
+      } else if (res) {
         console.warn(TAG, `Watch data status: HTTP ${res.status}`);
       }
     } catch (err) {
-      console.warn(TAG, 'Erro ao buscar watch data:', err);
+      console.warn(TAG, 'Aviso ao buscar watch data:', err?.message || err);
     }
 
     return null;
   }
 
-  async function fetchCommentsWithToken(initialToken, videoId, apiKey, client) {
+  async function fetchCommentsWithToken(initialToken, videoId) {
     if (!initialToken || !videoId) return;
-    if (!apiKey) apiKey = getApiKey();
-    if (!client) client = getClientCtx();
 
     let token = initialToken;
     let page = 0;
@@ -381,30 +395,28 @@
         break;
       }
 
-      const url = `https://www.youtube.com/youtubei/v1/next?key=${apiKey}&prettyPrint=false`;
       let res;
       try {
-        res = await _origFetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            context: { client },
-            continuation: token,
-          }),
-        });
+        res = await callInnerTubeApi({ continuation: token });
       } catch (err) {
-        console.warn(TAG, `Erro de rede na página ${page + 1}:`, err);
+        console.warn(TAG, `Aviso de rede na página ${page + 1}:`, err?.message || err);
         break;
       }
 
-      if (!res.ok) {
-        console.warn(TAG, `Página ${page + 1}: HTTP ${res.status}`);
+      if (!res || !res.ok) {
+        console.warn(TAG, `Página ${page + 1}: HTTP ${res ? res.status : 'falha'}`);
         break;
       }
 
       if (_activeFetchVideoId !== videoId) break;
 
-      const json = await res.json();
+      let json;
+      try {
+        json = await res.json();
+      } catch {
+        break;
+      }
+
       const pageComments = [];
       walkAndCollect(json, pageComments);
 
@@ -433,27 +445,17 @@
     _isFetching = true;
 
     try {
-      const apiKey = await waitForApiKey();
-      if (!apiKey) {
-        console.warn(TAG, 'INNERTUBE_API_KEY não disponível.');
-        return;
-      }
-
-      if (_activeFetchVideoId !== videoId) return;
-
-      const client = getClientCtx();
-      const token = await getOrFetchCommentToken(videoId, apiKey, client);
-
+      const token = await getOrFetchCommentToken(videoId);
       if (!token) {
-        console.warn(TAG, `Nenhum token de comentário encontrado para ${videoId}.`);
+        console.log(TAG, `Nenhum token de comentário encontrado para ${videoId}.`);
         return;
       }
 
       if (_activeFetchVideoId !== videoId) return;
 
-      await fetchCommentsWithToken(token, videoId, apiKey, client);
+      await fetchCommentsWithToken(token, videoId);
     } catch (e) {
-      console.error(TAG, 'Erro no fetch proativo:', e);
+      console.warn(TAG, 'Aviso no fetch proativo:', e?.message || e);
     } finally {
       if (_activeFetchVideoId === videoId) {
         _isFetching = false;
@@ -463,8 +465,12 @@
 
   // ─── Passive: Intercept fetch & XHR ───────────────────
 
-  const _origFetch = window.fetch;
   window.fetch = async function (input, init) {
+    // Se for uma requisição interna da nossa própria extensão, não intercepta recursivamente
+    if (init?.headers && (init.headers['X-YTSC-Internal'] || init.headers.get?.('X-YTSC-Internal'))) {
+      return _origFetch.call(this, input, init);
+    }
+
     const res = await _origFetch.call(this, input, init);
     try {
       const url = (typeof input === 'string' ? input : input?.url) || '';
@@ -497,9 +503,6 @@
     } catch {}
     return res;
   };
-
-  const _origOpen = XMLHttpRequest.prototype.open;
-  const _origSend = XMLHttpRequest.prototype.send;
 
   XMLHttpRequest.prototype.open = function (m, url, ...r) {
     this._ytscUrl = url || '';
@@ -540,7 +543,7 @@
 
   /**
    * Responde ao content.js quando este solicita comentários.
-   * Garante que mensagens enviadas antes de content.js carregar não sejam perdidas.
+   * Garante que comentários buscados antes do carregamento do content.js não sejam perdidos.
    */
   window.addEventListener('message', (event) => {
     if (
@@ -601,5 +604,5 @@
     setTimeout(onNavigate, 100);
   }
 
-  console.log(TAG, 'Injected script carregado (v1.6).');
+  console.log(TAG, 'Injected script carregado (v1.6.1).');
 })();
