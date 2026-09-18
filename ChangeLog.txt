@@ -1,5 +1,10 @@
 ## YouTube Super Comments - ChangeLog
 
+### v1.6.3 — 2026-09-18
+- Correção de paginação em findNextToken: evita captura acidental de tokens de respostas internas (replies), permitindo paginação completa de todos os comentários do vídeo
+- Priorização do token em content em vez do menu de ordenação de header no engagementPanels
+- Redução de tempo de carregamento e paginação contínua de até 50 páginas
+
 ### v1.6.2 — 2026-09-18
 - Validação estrita de tokens (tokenBelongsToVideo): descarta tokens obsoletos de ytInitialData em navegações SPA
 - Consulta automática do watch data atualizado da API para novos vídeos

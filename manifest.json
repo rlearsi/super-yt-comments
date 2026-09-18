@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "YouTube Super Comments",
   "short_name": "YT Super Comments",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Exibe comentários com timestamps diretamente sobre o player do YouTube no momento exato citado.",
   "icons": {
     "16": "icons/icon16.png",

@@ -167,7 +167,10 @@
           ).toLowerCase();
 
           if (id.includes('comment')) {
-            const token = findContinuationToken(panel);
+            // Prioriza o token dentro de content (seção de comentários),
+            // evitando tokens de menu de ordenação (Top/Newest) no header
+            const content = panel?.engagementPanelSectionListRenderer?.content;
+            const token = findContinuationToken(content) || findContinuationToken(panel);
             if (token && token.length > 20) {
               console.log(TAG, 'Token encontrado em engagementPanels:', token.slice(0, 40) + '...');
               return token;
@@ -260,6 +263,8 @@
 
   /**
    * Encontra o token para a PRÓXIMA página dentro da resposta da paginação de comentários.
+   * Busca estritamente o continuationItemRenderer no nível da lista de comentários,
+   * NUNCA pegando tokens de respostas internas (replies) de comentários individuais.
    */
   function findNextToken(responseData) {
     try {
@@ -268,12 +273,26 @@
       const endpoints = responseData?.onResponseReceivedEndpoints;
       if (Array.isArray(endpoints)) {
         for (const ep of endpoints) {
-          const token = findContinuationToken(ep);
-          if (token && token.length > 20) return token;
+          for (const actionName of ['appendContinuationItemsAction', 'reloadContinuationItemsCommand']) {
+            const action = ep?.[actionName];
+            const items = action?.continuationItems;
+            if (Array.isArray(items)) {
+              for (const item of items) {
+                // APENAS continuationItemRenderer direto na lista (próxima página de comentários)
+                // NUNCA pegar tokens aninhados dentro de replies (respostas de um comentário)
+                if (item?.continuationItemRenderer) {
+                  const token = item.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token;
+                  if (token && token.length > 20) {
+                    return token;
+                  }
+                }
+              }
+            }
+          }
         }
       }
 
-      const direct = findContinuationToken(responseData);
+      const direct = responseData?.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
       if (direct && direct.length > 20) return direct;
     } catch {}
     return null;
