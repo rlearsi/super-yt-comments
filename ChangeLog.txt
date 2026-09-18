@@ -1,5 +1,24 @@
 ## YouTube Super Comments - ChangeLog
 
+### v1.6.0 — 2026-09-18
+- Busca proativa via InnerTube API totalmente resiliente a navegação SPA (sem recarregar página)
+- Fallback automático para consulta de watch data via API (/youtubei/v1/next com videoId) quando ytInitialData estiver desatualizado
+- Extração ultra-robusta de tokens de comentários (suporte a layouts engagementPanels, itemSectionRenderer e busca recursiva inteligente)
+- Handshake bidirecional de mensagens entre injected.js e content.js (cache de comentários por vídeo, sem perda de mensagens de boot)
+- Interceptação de tokens em respostas nativas de watch-next do YouTube
+- Suporte a timestamps com início em 0:00 e segundos >= 0
+
+### v1.5.0 — 2026-09-18
+- Limpeza e rejeição estrita de comentários do vídeo anterior na troca de página/SPA
+- Botão fechar (✕) reposicionado para o canto superior direito do card, visível em hover
+- Correção dos avisos de line-clamp e -webkit-line-clamp no CSS
+
+### v1.4.0 — 2026-09-18
+- Expansão de comentários com clique no card no player
+- Pausa automática do temporizador do card ao passar o mouse
+- Exibição em pilha vertical para múltiplos comentários simultâneos
+- Correção de duplicação de cards ao navegar via popup
+
 ### v1.3.0 — 2026-09-18
 - Corrigido bug de fetch duplicado: debounce + rastreamento por video ID evitam chamadas duplas à API
 - Limite de páginas aumentado de 10 para 50 (~1000 comentários por vídeo)

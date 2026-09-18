@@ -59,7 +59,7 @@
     let m;
     while ((m = regex.exec(text)) !== null) {
       const secs = parseTimestamp(m[1]);
-      if (secs !== null && secs > 0) {
+      if (secs !== null && secs >= 0) {
         results.push({ formatted: m[1], seconds: secs });
       }
     }
@@ -365,7 +365,7 @@
 
   function initForVideo(videoId) {
     log('Init for video:', videoId);
-    state.lastVideoId = videoId;
+    // NOTE: state.lastVideoId is already set by onNavigate() before this call.
     state.comments    = [];
     state.shownMap.clear();
     state.lastCheckedSecond = -1;
@@ -395,6 +395,15 @@
 
   // ─── YouTube SPA Navigation ───────────────────────────
 
+  function requestComments(videoId) {
+    if (!videoId) return;
+    window.postMessage({
+      type:    'YTSC_GET_COMMENTS',
+      source:  'yt-super-comments-content',
+      videoId: videoId,
+    }, '*');
+  }
+
   function onNavigate() {
     const params = new URLSearchParams(location.search);
     const videoId = params.get('v');
@@ -404,7 +413,11 @@
     }
     if (videoId !== state.lastVideoId) {
       teardown();
+      // Set IMMEDIATELY so ingestComments() doesn't reject proactive
+      // comments that arrive from injected.js before initForVideo() runs.
+      state.lastVideoId = videoId;
       initForVideo(videoId);
+      requestComments(videoId);
     }
   }
 
@@ -482,5 +495,8 @@
   });
 
   onNavigate();
-  log('Content script loaded (v1.4).');
+  if (state.lastVideoId) {
+    requestComments(state.lastVideoId);
+  }
+  log('Content script loaded (v1.6).');
 })();
