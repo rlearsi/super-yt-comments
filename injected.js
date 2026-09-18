@@ -1,133 +1,169 @@
 /* =====================================================
    YouTube Super Comments - Injected Script (world: MAIN)
-   Runs in the PAGE context so it can access:
-     window.ytInitialData, window.ytcfg, window.fetch
-   
-   Strategy:
-   1. Intercept fetch + XHR to capture any /youtubei/v1/ response
-      that contains comments automatically (when YT loads them).
-   2. On every video navigation: proactively call InnerTube /next
-      with the comment continuation token extracted from ytInitialData,
-      paginating through multiple pages to get all comments.
-   3. Send collected comments to content.js via window.postMessage.
+   Roda no contexto da PÁGINA (acessa window.*, fetch, XHR).
+
+   Estratégia dupla:
+   1. PROATIVA: extrai o token de comentários de ytInitialData e
+      chama diretamente a InnerTube API /youtubei/v1/next
+      — o usuário NÃO precisa rolar.
+   2. PASSIVA: intercepta fetch/XHR — captura automaticamente
+      qualquer resposta do YouTube que contenha comentários
+      (inclusive quando o usuário rola).
    ===================================================== */
 
 (function () {
   'use strict';
 
-  const SOURCE_TAG = 'yt-super-comments-injected';
-  const MAX_PAGES  = 8;   // Max pagination pages to fetch proactively
-  const PAGE_DELAY = 300; // ms between pagination requests
+  const TAG      = '[YTSuperComments]';
+  const SOURCE   = 'yt-super-comments-injected';
+  const MAX_PAGES = 10;   // páginas de comentários para buscar proativamente
+  const PAGE_DELAY = 400; // ms entre páginas
 
-  // ─── InnerTube Helpers ────────────────────────────────
+  // ─── InnerTube helpers ────────────────────────────────
 
-  /** Gets the InnerTube API key from ytcfg */
   function getApiKey() {
     try {
-      return (
-        window.ytcfg?.get?.('INNERTUBE_API_KEY') ||
-        window.ytcfg?.data_?.INNERTUBE_API_KEY ||
-        ''
-      );
+      return window.ytcfg?.get?.('INNERTUBE_API_KEY')
+          || window.ytcfg?.data_?.INNERTUBE_API_KEY
+          || '';
     } catch { return ''; }
   }
 
-  /** Gets the InnerTube client context for API requests */
-  function getClientContext() {
+  function getClientCtx() {
     try {
-      const cfg = window.ytcfg?.data_ || {};
+      const d = window.ytcfg?.data_ || {};
       return {
-        clientName:    cfg.INNERTUBE_CONTEXT_CLIENT_NAME  || 'WEB',
-        clientVersion: cfg.INNERTUBE_CONTEXT_CLIENT_VERSION || '2.20240918.00.00',
-        hl:            cfg.HL || navigator.language?.slice(0, 2) || 'en',
-        gl:            cfg.GL || 'US',
+        clientName:    d.INNERTUBE_CONTEXT_CLIENT_NAME    || 'WEB',
+        clientVersion: d.INNERTUBE_CONTEXT_CLIENT_VERSION  || '2.20240918.00.00',
+        hl:            d.HL  || 'pt',
+        gl:            d.GL  || 'BR',
       };
     } catch {
-      return { clientName: 'WEB', clientVersion: '2.20240918.00.00', hl: 'en', gl: 'US' };
+      return { clientName: 'WEB', clientVersion: '2.20240918.00.00', hl: 'pt', gl: 'BR' };
     }
   }
 
+  // ─── Token extractor ──────────────────────────────────
   /**
-   * Recursively walks an object to find comment continuation tokens.
-   * YouTube puts them in different places depending on the version.
+   * Procura o token de continuação dos COMENTÁRIOS dentro de ytInitialData.
+   * Busca somente na coluna principal (results), nunca na coluna secundária
+   * (secondaryResults), para não pegar tokens de "vídeos relacionados".
+   *
+   * Identifica a seção de comentários por:
+   *  A) sectionIdentifier que contém "comment"
+   *  B) presença de commentsEntryPointHeaderRenderer na seção
+   *  C) fallback: qualquer continuationItemRenderer na coluna principal
    */
-  function findCommentToken(obj, depth = 0) {
-    if (!obj || typeof obj !== 'object' || depth > 25) return null;
-
-    // Pattern A: continuationCommand with token (most common)
-    if (typeof obj.token === 'string' && obj.request === 'CONTINUATION_REQUEST_TYPE_BROWSE') {
-      return obj.token;
-    }
-
-    // Pattern B: direct token on continuationCommand for comments
-    if (typeof obj.token === 'string' && obj.targetId &&
-        (obj.targetId.includes('comment') || obj.targetId === 'engagement-panel-comments-section')) {
-      return obj.token;
-    }
-
-    // Pattern C: reloadContinuationItemsCommand
-    if (obj.reloadContinuationItemsCommand?.token &&
-        (obj.reloadContinuationItemsCommand.targetId?.includes('comment') ||
-         obj.reloadContinuationItemsCommand.slot === 'RELOAD_CONTINUATION_SLOT_HEADER')) {
-      return obj.reloadContinuationItemsCommand.token;
-    }
-
-    const vals = Array.isArray(obj) ? obj : Object.values(obj);
-    for (const v of vals) {
-      if (v && typeof v === 'object') {
-        const found = findCommentToken(v, depth + 1);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Extracts the first comment-section continuation token from ytInitialData.
-   * Tries multiple known paths before falling back to recursive search.
-   */
-  function extractInitialToken(initialData) {
+  function extractCommentToken(data) {
     try {
-      // Path A: twoColumnWatchNextResults (standard watch page)
-      const contents = initialData
+      // ── Caminho 1: twoColumnWatchNextResults → coluna principal ──
+      const sections = data
         ?.contents
         ?.twoColumnWatchNextResults
         ?.results
         ?.results
         ?.contents;
 
-      if (Array.isArray(contents)) {
-        for (const section of contents) {
-          // itemSectionRenderer that is the comments section
-          const items = section?.itemSectionRenderer?.contents;
-          if (!items) continue;
-          for (const item of items) {
+      if (Array.isArray(sections)) {
+        // Primeira passagem: seções explicitamente identificadas como comentários
+        for (const section of sections) {
+          const isr = section?.itemSectionRenderer;
+          if (!isr?.contents) continue;
+
+          const isCommentSection =
+            isr.sectionIdentifier?.includes('comment') ||
+            isr.contents.some(c => c.commentsEntryPointHeaderRenderer);
+
+          if (!isCommentSection) continue;
+
+          for (const item of isr.contents) {
             const token = item?.continuationItemRenderer
-              ?.continuationEndpoint
-              ?.continuationCommand
-              ?.token;
-            if (token) return token;
+              ?.continuationEndpoint?.continuationCommand?.token;
+            if (token?.length > 20) {
+              console.log(TAG, 'Token (path A) encontrado:', token.slice(0, 40) + '...');
+              return token;
+            }
+          }
+        }
+
+        // Segunda passagem: qualquer continuationItemRenderer na coluna principal
+        // (fallback — em alguns layouts o sectionIdentifier não existe)
+        for (const section of sections) {
+          const isr = section?.itemSectionRenderer;
+          if (!isr?.contents) continue;
+          for (const item of isr.contents) {
+            const token = item?.continuationItemRenderer
+              ?.continuationEndpoint?.continuationCommand?.token;
+            if (token?.length > 20) {
+              console.log(TAG, 'Token (path B fallback) encontrado:', token.slice(0, 40) + '...');
+              return token;
+            }
           }
         }
       }
 
-      // Path B: engagementPanels (alternate layout)
-      const panels = initialData?.engagementPanels;
+      // ── Caminho 2: engagementPanels (layout alternativo) ──
+      const panels = data?.engagementPanels;
       if (Array.isArray(panels)) {
         for (const panel of panels) {
-          const token = findCommentToken(panel, 0);
-          if (token) return token;
+          const id = panel?.engagementPanelSectionListRenderer?.panelIdentifier || '';
+          if (!id.includes('comment')) continue;
+
+          const items = panel
+            ?.engagementPanelSectionListRenderer
+            ?.content
+            ?.sectionListRenderer
+            ?.contents;
+
+          if (!Array.isArray(items)) continue;
+
+          for (const item of items) {
+            const token = item?.itemSectionRenderer
+              ?.contents?.[0]
+              ?.continuationItemRenderer
+              ?.continuationEndpoint?.continuationCommand?.token;
+            if (token?.length > 20) {
+              console.log(TAG, 'Token (path C engagementPanel) encontrado:', token.slice(0, 40) + '...');
+              return token;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(TAG, 'extractCommentToken erro:', e);
+    }
+
+    console.warn(TAG, 'Nenhum token de comentário encontrado em ytInitialData.');
+    return null;
+  }
+
+  /**
+   * Encontra o token para a PRÓXIMA página dentro da resposta da API.
+   */
+  function findNextToken(responseData) {
+    try {
+      // Resposta de continuação de comentários
+      const endpoints = responseData?.onResponseReceivedEndpoints;
+      if (Array.isArray(endpoints)) {
+        for (const ep of endpoints) {
+          const items =
+            ep?.appendContinuationItemsAction?.continuationItems ||
+            ep?.reloadContinuationItemsCommand?.continuationItems;
+
+          if (!Array.isArray(items)) continue;
+          for (const item of items) {
+            const token = item?.continuationItemRenderer
+              ?.continuationEndpoint?.continuationCommand?.token;
+            if (token?.length > 20) return token;
+          }
         }
       }
     } catch {}
-
-    // Fallback: deep recursive search
-    return findCommentToken(initialData, 0);
+    return null;
   }
 
-  // ─── Comment Parsing ──────────────────────────────────
+  // ─── Comment parsing ──────────────────────────────────
 
-  /** Converts a YouTube "runs" text object to a plain string */
   function runsToText(obj) {
     if (!obj) return '';
     if (typeof obj === 'string') return obj;
@@ -135,200 +171,89 @@
     return '';
   }
 
-  /** Picks the best-resolution thumbnail URL from an array */
-  function bestThumb(thumbnails) {
-    if (!Array.isArray(thumbnails) || thumbnails.length === 0) return '';
-    // Prefer 48px or close
-    const sorted = [...thumbnails].sort((a, b) => Math.abs((a.width || 0) - 48) - Math.abs((b.width || 0) - 48));
-    return sorted[0]?.url || '';
+  function bestThumb(thumbs) {
+    if (!Array.isArray(thumbs) || !thumbs.length) return '';
+    return ([...thumbs].sort((a, b) => Math.abs((a.width || 0) - 48) - Math.abs((b.width || 0) - 48)))[0]?.url || '';
   }
 
-  /**
-   * Recursively walks an API response object and collects comment objects.
-   * Handles both old (commentRenderer) and new (commentEntityPayload) formats.
-   */
   function walkAndCollect(obj, out, depth = 0) {
-    if (!obj || typeof obj !== 'object' || depth > 35) return;
+    if (!obj || typeof obj !== 'object' || depth > 40) return;
 
-    // ── Format A: Classic commentRenderer ──
+    // Formato clássico: commentRenderer
     if (obj.commentRenderer) {
       const c = obj.commentRenderer;
-      const text   = runsToText(c.contentText);
-      const author = runsToText(c.authorText) || 'Anônimo';
-      const avatar = bestThumb(c.authorThumbnail?.thumbnails);
-      if (text) out.push({ text, author, avatar });
+      const text = runsToText(c.contentText);
+      if (text) out.push({
+        text,
+        author: runsToText(c.authorText) || 'Anônimo',
+        avatar: bestThumb(c.authorThumbnail?.thumbnails),
+      });
     }
 
-    // ── Format B: New commentEntityPayload (2024+) ──
+    // Formato novo (2024+): commentEntityPayload
     if (obj.commentEntityPayload) {
-      const c    = obj.commentEntityPayload;
+      const c = obj.commentEntityPayload;
       const text = c.properties?.content?.content || '';
-      const author = c.author?.displayName || 'Anônimo';
-      const avatar = c.author?.avatarThumbnailUrl || '';
-      if (text) out.push({ text, author, avatar });
+      if (text) out.push({
+        text,
+        author: c.author?.displayName || 'Anônimo',
+        avatar: c.author?.avatarThumbnailUrl || '',
+      });
     }
 
-    // ── Format C: engagementPanelSectionListRenderer with comments ──
+    // commentViewModel (outro formato novo)
     if (obj.commentViewModel) {
-      const c    = obj.commentViewModel;
+      const c = obj.commentViewModel;
       const text = c.commentText || runsToText(c.renderedCommentText) || '';
-      const author = c.authorDisplayName || 'Anônimo';
-      const avatar = c.authorThumbnailUrl || '';
-      if (text) out.push({ text, author, avatar });
+      if (text) out.push({
+        text,
+        author: c.authorDisplayName || 'Anônimo',
+        avatar: c.authorThumbnailUrl || '',
+      });
     }
 
-    // Recurse
     const iter = Array.isArray(obj) ? obj : Object.values(obj);
     for (const v of iter) {
       if (v && typeof v === 'object') walkAndCollect(v, out, depth + 1);
     }
   }
 
-  /**
-   * Finds the next continuation token inside an API response
-   * (for paginating to the next page of comments).
-   */
-  function findNextToken(responseData) {
-    // Look for continuationItemRenderer at top level of the response
-    try {
-      const items = responseData
-        ?.onResponseReceivedEndpoints?.[0]
-        ?.appendContinuationItemsAction
-        ?.continuationItems;
-
-      if (Array.isArray(items)) {
-        for (const item of items) {
-          const token = item?.continuationItemRenderer
-            ?.continuationEndpoint
-            ?.continuationCommand
-            ?.token;
-          if (token) return token;
-        }
-      }
-    } catch {}
-
-    // Fallback: recursive search (slower)
-    return findCommentToken(responseData, 0);
-  }
-
-  // ─── Sending Comments ─────────────────────────────────
+  // ─── Send to content.js ───────────────────────────────
 
   function sendComments(comments) {
-    if (!comments || comments.length === 0) return;
-    window.postMessage({
-      type:     'YTSC_COMMENTS',
-      source:   SOURCE_TAG,
-      comments: comments,
-    }, '*');
+    if (!comments?.length) return;
+    window.postMessage({ type: 'YTSC_COMMENTS', source: SOURCE, comments }, '*');
   }
 
-  // ─── Proactive InnerTube Fetch ────────────────────────
-
-  let _activeFetch = false; // Prevent concurrent fetches
-
-  /**
-   * Proactively fetches comments for the current video using InnerTube API.
-   * Paginates through up to MAX_PAGES pages.
-   */
-  async function fetchCommentsProactively() {
-    if (_activeFetch) return;
-    _activeFetch = true;
-
-    try {
-      const apiKey = getApiKey();
-      if (!apiKey) { _activeFetch = false; return; }
-
-      // Wait a bit for ytInitialData to be populated by YouTube
-      await sleep(1500);
-
-      const initialData = window.ytInitialData;
-      if (!initialData) { _activeFetch = false; return; }
-
-      let token = extractInitialToken(initialData);
-      if (!token) {
-        console.log('[YTSuperComments] No initial comment token found in ytInitialData');
-        _activeFetch = false;
-        return;
-      }
-
-      console.log('[YTSuperComments] Starting proactive comment fetch...');
-      const client = getClientContext();
-      let page = 0;
-
-      while (token && page < MAX_PAGES) {
-        try {
-          const url = `https://www.youtube.com/youtubei/v1/next?key=${apiKey}&prettyPrint=false`;
-          const res = await fetch(url, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              context: { client },
-              continuation: token,
-            }),
-          });
-
-          if (!res.ok) break;
-          const data = await res.json();
-
-          // Parse comments from this page
-          const pageComments = [];
-          walkAndCollect(data, pageComments);
-          if (pageComments.length > 0) {
-            sendComments(pageComments);
-            console.log(`[YTSuperComments] Page ${page + 1}: ${pageComments.length} comments`);
-          }
-
-          // Get next page token
-          token = findNextToken(data);
-          page++;
-
-          if (token && page < MAX_PAGES) await sleep(PAGE_DELAY);
-        } catch (e) {
-          console.log('[YTSuperComments] Fetch error:', e);
-          break;
-        }
-      }
-
-      console.log(`[YTSuperComments] Done. Fetched ${page} page(s).`);
-    } catch (e) {
-      console.log('[YTSuperComments] Proactive fetch failed:', e);
-    } finally {
-      _activeFetch = false;
-    }
-  }
-
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  // ─── Intercept fetch (passive capture) ───────────────
-  // Captures comments from ANY YouTube API call that returns comment data,
-  // e.g. when the user naturally scrolls to comments or loads more.
+  // ─── Passive: intercept fetch + XHR ───────────────────
+  // Captura qualquer resposta de API que contenha comentários
+  // (dispara quando o usuário rola até a seção de comentários).
 
   const _origFetch = window.fetch;
   window.fetch = async function (input, init) {
-    const response = await _origFetch.call(this, input, init);
+    const res = await _origFetch.call(this, input, init);
     try {
       const url = (typeof input === 'string' ? input : input?.url) || '';
       if (url.includes('/youtubei/v1/')) {
-        const clone = response.clone();
-        clone.json().then(data => {
+        res.clone().json().then(data => {
           const comments = [];
           walkAndCollect(data, comments);
-          if (comments.length > 0) sendComments(comments);
+          if (comments.length) {
+            console.log(TAG, `Interceptado fetch: ${comments.length} comentário(s)`);
+            sendComments(comments);
+          }
         }).catch(() => {});
       }
     } catch {}
-    return response;
+    return res;
   };
 
-  // ─── Intercept XHR (fallback) ─────────────────────────
-  const _origXHROpen = XMLHttpRequest.prototype.open;
-  const _origXHRSend = XMLHttpRequest.prototype.send;
+  const _origOpen = XMLHttpRequest.prototype.open;
+  const _origSend = XMLHttpRequest.prototype.send;
 
-  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+  XMLHttpRequest.prototype.open = function (m, url, ...r) {
     this._ytscUrl = url || '';
-    return _origXHROpen.call(this, method, url, ...rest);
+    return _origOpen.call(this, m, url, ...r);
   };
 
   XMLHttpRequest.prototype.send = function (body) {
@@ -338,29 +263,119 @@
           const data = JSON.parse(this.responseText);
           const comments = [];
           walkAndCollect(data, comments);
-          if (comments.length > 0) sendComments(comments);
+          if (comments.length) {
+            console.log(TAG, `Interceptado XHR: ${comments.length} comentário(s)`);
+            sendComments(comments);
+          }
         } catch {}
       });
     }
-    return _origXHRSend.call(this, body);
+    return _origSend.call(this, body);
   };
 
-  // ─── Navigation Listener ──────────────────────────────
-  // YouTube is a SPA. Listen for navigation events to re-trigger fetch.
+  // ─── Proactive fetch ──────────────────────────────────
 
-  function onVideoNavigate() {
-    _activeFetch = false; // allow new fetch
-    // Small delay to let ytInitialData update for new video
-    setTimeout(fetchCommentsProactively, 500);
+  let _fetching = false;
+
+  async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  async function fetchCommentsPro() {
+    if (_fetching) return;
+    _fetching = true;
+
+    try {
+      // Aguarda ytInitialData estar disponível (YouTube injeta no HTML, mas
+      // o objeto só fica pronto depois que os scripts da página executam).
+      let data = null;
+      for (let i = 0; i < 20; i++) {     // até 10s de espera
+        await sleep(500);
+        data = window.ytInitialData;
+        if (data?.contents) break;
+      }
+
+      if (!data?.contents) {
+        console.warn(TAG, 'ytInitialData não disponível após espera.');
+        _fetching = false;
+        return;
+      }
+
+      const apiKey = getApiKey();
+      if (!apiKey) {
+        console.warn(TAG, 'INNERTUBE_API_KEY não encontrado.');
+        _fetching = false;
+        return;
+      }
+
+      let token = extractCommentToken(data);
+      if (!token) {
+        console.warn(TAG, 'Token de comentários não encontrado em ytInitialData.');
+        _fetching = false;
+        return;
+      }
+
+      const client = getClientCtx();
+      console.log(TAG, `Buscando comentários proativamente (até ${MAX_PAGES} páginas)...`);
+
+      let page = 0;
+      let totalComments = 0;
+
+      while (token && page < MAX_PAGES) {
+        const url = `https://www.youtube.com/youtubei/v1/next?key=${apiKey}&prettyPrint=false`;
+        const res = await _origFetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            context: { client },
+            continuation: token,
+          }),
+        });
+
+        if (!res.ok) {
+          console.warn(TAG, `Página ${page + 1}: HTTP ${res.status}`);
+          break;
+        }
+
+        const json = await res.json();
+        const pageComments = [];
+        walkAndCollect(json, pageComments);
+
+        if (pageComments.length) {
+          sendComments(pageComments);
+          totalComments += pageComments.length;
+          console.log(TAG, `Página ${page + 1}: ${pageComments.length} comentários (total: ${totalComments})`);
+        } else {
+          console.log(TAG, `Página ${page + 1}: nenhum comentário extraído.`);
+          break;
+        }
+
+        token = findNextToken(json);
+        page++;
+        if (token && page < MAX_PAGES) await sleep(PAGE_DELAY);
+      }
+
+      console.log(TAG, `Proativo concluído: ${page} pág(s), ${totalComments} comentários com timestamp.`);
+    } catch (e) {
+      console.error(TAG, 'Erro no fetch proativo:', e);
+    } finally {
+      _fetching = false;
+    }
   }
 
-  document.addEventListener('yt-navigate-finish', onVideoNavigate);
+  // ─── Navigation ───────────────────────────────────────
 
-  // Initial load
+  function onNavigate() {
+    if (!location.href.includes('youtube.com/watch')) return;
+    _fetching = false;
+    fetchCommentsPro();
+  }
+
+  document.addEventListener('yt-navigate-finish', onNavigate);
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', onVideoNavigate);
+    document.addEventListener('DOMContentLoaded', onNavigate);
   } else {
-    onVideoNavigate();
+    onNavigate();
   }
 
+  console.log(TAG, 'Injected script carregado (v1.2).');
 })();
