@@ -38,7 +38,7 @@ Extensão para o Google Chrome que detecta comentários do YouTube contendo time
 
 4. **Selecione a pasta** do projeto:
    ```
-   /opt/lampp/htdocs/yt-super-comments/
+   /opt/lampp/htdocs/super-yt-comments/
    ```
 
 5. A extensão aparecerá na lista com o ícone 🎬💬. **Pronto!**
@@ -68,7 +68,7 @@ Extensão para o Google Chrome que detecta comentários do YouTube contendo time
 ## 🗂️ Estrutura de Arquivos
 
 ```
-yt-super-comments/
+super-yt-comments/
 ├── manifest.json        ← Configuração da extensão (Manifest V3)
 ├── content.js           ← Script injetado nas páginas do YouTube
 ├── styles.css           ← Estilos do overlay e animações
@@ -98,4 +98,4 @@ Veja [ChangeLog.txt](ChangeLog.txt).
 
 ---
 
-*Desenvolvido com ❤️ — YouTube Super Comments v1.0.0*
+*Desenvolvido com ❤️ — Super YouTube Comments v1.0.0*
