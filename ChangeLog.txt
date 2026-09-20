@@ -1,5 +1,12 @@
 ## YouTube Super Comments - ChangeLog
 
+### v1.6.4 — 2026-09-20
+- Correção de TypeError: Cannot read properties of undefined (reading 'sendMessage') em content.js ao recarregar extensão ou quando o contexto for invalidado
+- Implementada verificação defensiva de contexto da extensão (isExtensionValid) antes de invocar APIs do chrome.runtime e chrome.storage
+- Proteção com try/catch e optional chaining em notifyPopup ao despachar COMMENTS_UPDATED
+- Atualização dinâmica em tempo real do popup ao receber COMMENTS_UPDATED via chrome.runtime.onMessage
+- Limpeza preventiva de timers e listeners (teardown) se o contexto da extensão for invalidado
+
 ### v1.6.3 — 2026-09-18
 - Correção de paginação em findNextToken: evita captura acidental de tokens de respostas internas (replies), permitindo paginação completa de todos os comentários do vídeo
 - Priorização do token em content em vez do menu de ordenação de header no engagementPanels

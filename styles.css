@@ -1,9 +1,9 @@
 /* =====================================================
-   YouTube Super Comments - Overlay Styles v1.5
-   Clean app-like cards: hover-close, pause, expand
+   YouTube Super Comments - Overlay Styles
+   Twitch-inspired chat overlay with crisp typography
    ===================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 /* --- Overlay Container --- */
 #ytsc-overlay {
@@ -13,74 +13,168 @@
   z-index: 2147483640;
   display: flex;
   flex-direction: column-reverse;
-  gap: 8px;
-  max-width: 420px;
+  gap: 14px;
+  max-width: 440px;
   pointer-events: none;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* --- Comment Card --- */
+/* --- Comment Card Wrapper --- */
 .ytsc-comment-card {
   position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 13px 10px 10px;
-  border-radius: 14px;
-  background: rgba(8, 8, 18, 0.78);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.5);
-  max-width: 420px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  max-width: 440px;
   pointer-events: auto;
   cursor: pointer;
   will-change: transform, opacity;
-  animation: ytsc-popin 0.48s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  transition: background 0.2s, border-color 0.2s, max-width 0.3s ease;
-}
-
-.ytsc-comment-card:hover,
-.ytsc-comment-card.ytsc-paused {
-  background: rgba(12, 12, 26, 0.92);
-  border-color: rgba(124, 92, 255, 0.22);
+  animation: ytsc-popin 0.38s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+  transition: max-width 0.25s ease;
 }
 
 .ytsc-comment-card.ytsc-expanded {
-  max-width: 500px;
+  max-width: 540px;
   cursor: default;
-  border-color: rgba(124, 92, 255, 0.28);
 }
 
 /* Pop-in */
 @keyframes ytsc-popin {
-  0%   { opacity: 0; transform: translateX(-24px) scale(0.82); }
-  65%  { opacity: 1; transform: translateX(3px)   scale(1.02); }
-  100% { opacity: 1; transform: translateX(0)     scale(1);    }
+  0%   { opacity: 0; transform: translateX(-18px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 
 /* Fade-out */
 .ytsc-comment-card.ytsc-fadeout {
-  animation: ytsc-fadeout 0.55s ease forwards !important;
+  animation: ytsc-fadeout 0.4s ease forwards !important;
 }
 
 @keyframes ytsc-fadeout {
-  0%   { opacity: 1; transform: translateX(0) scale(1);         }
-  100% { opacity: 0; transform: translateX(-14px) scale(0.9);   }
+  0%   { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(-14px); }
 }
 
-/* --- Close button (×) — top-right, visible on hover --- */
-.ytsc-close-btn {
-  position: absolute;
-  top: 6px;
-  right: 7px;
-  width: 18px;
-  height: 18px;
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
+/* --- Header: Avatar + Username + Badges --- */
+.ytsc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px;
+}
+
+.ytsc-user-group {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+/* --- Avatar (Icone Redondo) --- */
+.ytsc-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 9px;
+  object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.ytsc-avatar-fallback {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c5cff 0%, #4f3bce 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* --- Username (Nome mais grosso) --- */
+.ytsc-author {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 2px 5px rgba(0, 0, 0, 0.8),
+    0 0 2px rgba(0, 0, 0, 0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+  letter-spacing: -0.2px;
+}
+
+/* --- Timestamp Badge (No rounded corners) --- */
+.ytsc-timestamp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 11px;
+  font-weight: 700;
+  color: #e2e8f0;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.ytsc-timestamp-badge::before {
+  content: '⏱';
+  font-size: 10px;
+}
+
+/* --- Header Actions --- */
+.ytsc-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Expand hint — visible on hover */
+.ytsc-expand-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  transition: opacity 0.18s;
+  cursor: pointer;
+}
+
+.ytsc-comment-card:hover .ytsc-expand-hint {
+  opacity: 1;
+}
+
+.ytsc-comment-card.ytsc-expanded .ytsc-expand-hint {
+  display: none;
+}
+
+/* Close button (×) — sharp corners */
+.ytsc-close-btn {
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
   font-family: inherit;
   line-height: 1;
   cursor: pointer;
@@ -89,10 +183,8 @@
   justify-content: center;
   opacity: 0;
   transition: opacity 0.18s, background 0.18s, color 0.18s;
-  z-index: 2;
 }
 
-/* Show close btn on hover or while paused/expanded */
 .ytsc-comment-card:hover .ytsc-close-btn,
 .ytsc-comment-card.ytsc-paused .ytsc-close-btn,
 .ytsc-comment-card.ytsc-expanded .ytsc-close-btn {
@@ -100,101 +192,45 @@
 }
 
 .ytsc-close-btn:hover {
-  background: rgba(255, 80, 80, 0.3);
+  background: rgba(239, 68, 68, 0.85);
   color: #fff;
+  border-color: rgba(239, 68, 68, 1);
 }
 
-/* --- Avatar --- */
-.ytsc-avatar {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1.5px solid rgba(124, 92, 255, 0.38);
-  background: rgba(255, 255, 255, 0.05);
-  margin-top: 1px;
-}
-
-.ytsc-avatar-fallback {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #7c5cff 0%, #4f3bce 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  margin-top: 1px;
-}
-
-/* --- Content --- */
-.ytsc-content {
-  flex: 1;
-  min-width: 0;
+/* --- Comment Box (White background, sharp corners, visible font) --- */
+.ytsc-comment-box {
+  position: relative;
+  background: #ffffff;
+  border-radius: 0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.38),
+    0 1px 4px rgba(0, 0, 0, 0.2);
+  padding: 10px 14px 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  /* Leave space for the close button on the right */
-  padding-right: 14px;
+  gap: 8px;
+  transition: box-shadow 0.2s, border-color 0.2s;
 }
 
-.ytsc-comment-card.ytsc-expanded .ytsc-content {
-  padding-right: 14px;
+.ytsc-comment-card:hover .ytsc-comment-box,
+.ytsc-comment-card.ytsc-paused .ytsc-comment-box {
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.45),
+    0 0 0 1.5px rgba(124, 92, 255, 0.45);
 }
 
-.ytsc-header {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.ytsc-comment-card.ytsc-expanded .ytsc-comment-box {
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.5),
+    0 0 0 2px rgba(124, 92, 255, 0.55);
 }
 
-.ytsc-author {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.88);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 150px;
-}
-
-.ytsc-timestamp-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px 7px;
-  border-radius: 20px;
-  background: rgba(124, 92, 255, 0.18);
-  font-size: 10px;
-  font-weight: 700;
-  color: #b8a4ff;
-  white-space: nowrap;
-}
-
-.ytsc-timestamp-badge::before { content: '⏱'; font-size: 9px; }
-
-/* Expand hint — shown on hover (normal state only) */
-.ytsc-expand-hint {
-  margin-left: auto;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.2);
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.18s;
-}
-
-.ytsc-comment-card:hover .ytsc-expand-hint { opacity: 1; }
-.ytsc-comment-card.ytsc-expanded .ytsc-expand-hint { display: none; }
-
-/* --- Text --- */
+/* --- Comment Text --- */
 .ytsc-text {
-  font-size: 12.5px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.68);
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
   line-height: 1.45;
   word-break: break-word;
   display: -webkit-box;
@@ -204,7 +240,6 @@
   overflow: hidden;
 }
 
-/* Expanded: show full text */
 .ytsc-comment-card.ytsc-expanded .ytsc-text {
   display: block;
   -webkit-line-clamp: unset;
@@ -213,35 +248,41 @@
 }
 
 .ytsc-text .ytsc-ts-highlight {
-  color: #a78bfa;
-  font-weight: 600;
+  color: #4f46e5;
+  font-weight: 700;
 }
 
-/* Pause indicator dot */
+/* Pause indicator */
 .ytsc-pause-icon {
   display: none;
   position: absolute;
-  bottom: 7px;
-  right: 9px;
-  font-size: 8px;
-  color: rgba(124, 92, 255, 0.45);
+  bottom: 6px;
+  right: 8px;
+  font-size: 9px;
+  color: #64748b;
 }
-.ytsc-comment-card.ytsc-paused .ytsc-pause-icon { display: block; }
-.ytsc-comment-card.ytsc-expanded .ytsc-pause-icon { display: none; }
 
-/* --- Progress bar (animation-based for CSS pause support) --- */
+.ytsc-comment-card.ytsc-paused .ytsc-pause-icon {
+  display: block;
+}
+
+.ytsc-comment-card.ytsc-expanded .ytsc-pause-icon {
+  display: none;
+}
+
+/* --- Progress Bar --- */
 .ytsc-progress {
-  height: 2px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 2px;
+  height: 3px;
+  background: #e2e8f0;
+  border-radius: 0;
   overflow: hidden;
-  margin-top: 6px;
+  width: 100%;
 }
 
 .ytsc-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #7c5cff, #b8a4ff);
-  border-radius: 2px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 0;
   transform-origin: left;
   animation: ytsc-shrink linear forwards;
   animation-play-state: running;
@@ -252,7 +293,6 @@
   to   { transform: scaleX(0); }
 }
 
-/* Pause the bar when card is paused or expanded */
 .ytsc-comment-card.ytsc-paused .ytsc-progress-bar,
 .ytsc-comment-card.ytsc-expanded .ytsc-progress-bar {
   animation-play-state: paused;

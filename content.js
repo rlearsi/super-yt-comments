@@ -138,12 +138,26 @@
     }
   }
 
+  /** Helper to safely check if the extension context is still valid. */
+  function isExtensionValid() {
+    try {
+      return typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
+    } catch (_) {
+      return false;
+    }
+  }
+
   function notifyPopup() {
-    chrome.runtime.sendMessage({
-      type:       'COMMENTS_UPDATED',
-      count:      state.comments.length,
-      videoId:    state.lastVideoId,
-    }).catch(() => {});
+    if (!isExtensionValid()) return;
+    try {
+      chrome.runtime.sendMessage({
+        type:       'COMMENTS_UPDATED',
+        count:      state.comments.length,
+        videoId:    state.lastVideoId,
+      })?.catch?.(() => {});
+    } catch (_) {
+      // Ignored: extension context invalidated or popup receiver not open
+    }
   }
 
   // ─── Overlay ──────────────────────────────────────────
@@ -197,12 +211,12 @@
       avatarEl = makeFallbackAvatar(comment.author);
     }
 
-    // Content
-    const content = document.createElement('div');
-    content.className = 'ytsc-content';
-
+    // Header: Round avatar + thicker username beside it + timestamp badge + actions
     const header = document.createElement('div');
     header.className = 'ytsc-header';
+
+    const userGroup = document.createElement('div');
+    userGroup.className = 'ytsc-user-group';
 
     const authorEl = document.createElement('span');
     authorEl.className = 'ytsc-author';
@@ -212,31 +226,37 @@
     badge.className = 'ytsc-timestamp-badge';
     badge.textContent = comment.formatted;
 
+    userGroup.appendChild(avatarEl);
+    userGroup.appendChild(authorEl);
+    userGroup.appendChild(badge);
+
+    const headerActions = document.createElement('div');
+    headerActions.className = 'ytsc-header-actions';
+
     const expandHint = document.createElement('span');
     expandHint.className = 'ytsc-expand-hint';
     expandHint.textContent = '\u2194';
 
-    const pauseIcon = document.createElement('span');
-    pauseIcon.className = 'ytsc-pause-icon';
-    pauseIcon.textContent = '\u23f8';
-
-    // Close button — top-right corner, appears on hover/pause/expand
+    // Close button
     const closeBtn = document.createElement('button');
     closeBtn.className = 'ytsc-close-btn';
     closeBtn.textContent = '\u00d7';
     closeBtn.title = 'Fechar';
     closeBtn.setAttribute('aria-label', 'Fechar comentário');
 
-    header.appendChild(authorEl);
-    header.appendChild(badge);
-    header.appendChild(expandHint);
+    headerActions.appendChild(expandHint);
+    headerActions.appendChild(closeBtn);
+
+    header.appendChild(userGroup);
+    header.appendChild(headerActions);
+
+    // Comment box below header: white background, visible font, sharp corners
+    const commentBox = document.createElement('div');
+    commentBox.className = 'ytsc-comment-box';
 
     const textEl = document.createElement('div');
     textEl.className = 'ytsc-text';
     textEl.innerHTML = highlightText(comment.text);
-
-    content.appendChild(header);
-    content.appendChild(textEl);
 
     // Progress bar (animation-based so it can be CSS-paused)
     const pw = document.createElement('div');
@@ -244,12 +264,17 @@
     const pb = document.createElement('div');
     pb.className = 'ytsc-progress-bar';
     pw.appendChild(pb);
-    content.appendChild(pw);
 
-    card.appendChild(closeBtn);   // absolute top-right
-    card.appendChild(pauseIcon);  // absolute bottom-right
-    card.appendChild(avatarEl);
-    card.appendChild(content);
+    const pauseIcon = document.createElement('span');
+    pauseIcon.className = 'ytsc-pause-icon';
+    pauseIcon.textContent = '\u23f8';
+
+    commentBox.appendChild(textEl);
+    commentBox.appendChild(pw);
+    commentBox.appendChild(pauseIcon);
+
+    card.appendChild(header);
+    card.appendChild(commentBox);
     state.overlayEl.appendChild(card);
 
     // Set animation duration on progress bar
@@ -306,6 +331,10 @@
   // ─── Sync Loop ────────────────────────────────────────
 
   function syncLoop() {
+    if (!isExtensionValid()) {
+      teardown();
+      return;
+    }
     state.rafHandle = requestAnimationFrame(syncLoop);
     if (!state.enabled || !state.videoEl || !state.overlayEl) return;
 
@@ -420,11 +449,22 @@
     }
   }
 
-  document.addEventListener('yt-navigate-finish', onNavigate);
+  document.addEventListener('yt-navigate-finish', () => {
+    if (!isExtensionValid()) {
+      teardown();
+      return;
+    }
+    onNavigate();
+  });
 
   // URL-change polling fallback
   let _lastHref = location.href;
-  setInterval(() => {
+  const navInterval = setInterval(() => {
+    if (!isExtensionValid()) {
+      clearInterval(navInterval);
+      teardown();
+      return;
+    }
     if (location.href !== _lastHref) {
       _lastHref = location.href;
       onNavigate();
@@ -435,6 +475,7 @@
 
   /** Receive comments from injected.js running in MAIN world */
   window.addEventListener('message', (event) => {
+    if (!isExtensionValid()) return;
     if (
       event.source !== window ||
       event.data?.source !== 'yt-super-comments-injected' ||
@@ -444,58 +485,70 @@
   });
 
   /** Receive commands from popup.js */
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (msg.type === 'GET_STATUS') {
-      sendResponse({
-        enabled:      state.enabled,
-        commentCount: state.comments.length,
-        videoId:      state.lastVideoId,
-        comments: state.comments.map(c => ({
-          author:    c.author,
-          text:      c.text.slice(0, 120),
-          formatted: c.formatted,
-          seconds:   c.seconds,
-        })),
-      });
-      return true;
-    }
-
-    if (msg.type === 'SET_ENABLED') {
-      state.enabled = msg.value;
-      chrome.storage.local.set({ enabled: msg.value });
-      if (!msg.value) {
-        state.overlayEl?.querySelectorAll('.ytsc-comment-card').forEach(dismissCard);
+  try {
+    chrome.runtime?.onMessage?.addListener((msg, _sender, sendResponse) => {
+      if (msg.type === 'GET_STATUS') {
+        sendResponse({
+          enabled:      state.enabled,
+          commentCount: state.comments.length,
+          videoId:      state.lastVideoId,
+          comments: state.comments.map(c => ({
+            author:    c.author,
+            text:      c.text.slice(0, 120),
+            formatted: c.formatted,
+            seconds:   c.seconds,
+          })),
+        });
+        return true;
       }
-      sendResponse({ ok: true });
-      return true;
-    }
 
-    if (msg.type === 'SEEK_TO') {
-      if (state.videoEl) {
-        state.seekFromPopup = true;  // flag so handleSeeked knows this came from popup
-        state.videoEl.currentTime = msg.seconds;
+      if (msg.type === 'SET_ENABLED') {
+        state.enabled = msg.value;
+        try {
+          chrome.storage?.local?.set?.({ enabled: msg.value });
+        } catch (_) {}
+        if (!msg.value) {
+          state.overlayEl?.querySelectorAll('.ytsc-comment-card').forEach(dismissCard);
+        }
+        sendResponse({ ok: true });
+        return true;
       }
-      sendResponse({ ok: true });
-      return true;
-    }
 
-    if (msg.type === 'SET_DURATION') {
-      CONFIG.displayDuration = msg.value;
-      chrome.storage.local.set({ displayDuration: msg.value });
-      sendResponse({ ok: true });
-      return true;
-    }
-  });
+      if (msg.type === 'SEEK_TO') {
+        if (state.videoEl) {
+          state.seekFromPopup = true;  // flag so handleSeeked knows this came from popup
+          state.videoEl.currentTime = msg.seconds;
+        }
+        sendResponse({ ok: true });
+        return true;
+      }
+
+      if (msg.type === 'SET_DURATION') {
+        CONFIG.displayDuration = msg.value;
+        try {
+          chrome.storage?.local?.set?.({ displayDuration: msg.value });
+        } catch (_) {}
+        sendResponse({ ok: true });
+        return true;
+      }
+    });
+  } catch (_) {}
 
   // ─── Restore settings & boot ──────────────────────────
-  chrome.storage.local.get(['enabled', 'displayDuration'], (r) => {
-    if (r.enabled !== undefined)   state.enabled = r.enabled;
-    if (r.displayDuration)         CONFIG.displayDuration = r.displayDuration;
-  });
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.get(['enabled', 'displayDuration'], (r) => {
+        if (!isExtensionValid() || chrome.runtime?.lastError) return;
+        if (!r) return;
+        if (r.enabled !== undefined)   state.enabled = r.enabled;
+        if (r.displayDuration)         CONFIG.displayDuration = r.displayDuration;
+      });
+    }
+  } catch (_) {}
 
   onNavigate();
   if (state.lastVideoId) {
     requestComments(state.lastVideoId);
   }
-  log('Content script loaded (v1.6).');
+  log('Content script loaded (v1.6.4).');
 })();

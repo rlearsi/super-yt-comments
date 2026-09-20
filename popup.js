@@ -120,5 +120,13 @@
     getStatus().finally(() => setTimeout(() => { refreshBtn.textContent = '↻ Atualizar'; }, 600));
   });
 
+  try {
+    chrome.runtime?.onMessage?.addListener((msg) => {
+      if (msg?.type === 'COMMENTS_UPDATED') {
+        getStatus();
+      }
+    });
+  } catch (_) {}
+
   getStatus();
 })();
