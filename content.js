@@ -138,11 +138,21 @@
     }
   }
 
+  let _isContextInvalidated = false;
+
   /** Helper to safely check if the extension context is still valid. */
   function isExtensionValid() {
+    if (_isContextInvalidated) return false;
     try {
-      return typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
+      if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.id) {
+        _isContextInvalidated = true;
+        teardown();
+        return false;
+      }
+      return true;
     } catch (_) {
+      _isContextInvalidated = true;
+      teardown();
       return false;
     }
   }
@@ -405,7 +415,6 @@
         if (attempts < 25) setTimeout(() => tryInit(attempts + 1), 100);
         return;
       }
-      if (state.videoEl) state.videoEl.addEventListener('seeked', handleSeeked);
       startSync();
     };
     tryInit(0); // Imediato sem 800ms de atraso
@@ -413,6 +422,12 @@
 
   function teardown() {
     stopSync();
+    if (navInterval) {
+      clearInterval(navInterval);
+      navInterval = null;
+    }
+    window.removeEventListener('message', onWindowMessage);
+    document.removeEventListener('yt-navigate-finish', onYtNavigateFinish);
     document.querySelectorAll('.ytsc-comment-card').forEach(el => el.remove());
     removeOverlay();
     state.comments    = [];
@@ -449,22 +464,16 @@
     }
   }
 
-  document.addEventListener('yt-navigate-finish', () => {
-    if (!isExtensionValid()) {
-      teardown();
-      return;
-    }
+  function onYtNavigateFinish() {
+    if (!isExtensionValid()) return;
     onNavigate();
-  });
+  }
+  document.addEventListener('yt-navigate-finish', onYtNavigateFinish);
 
   // URL-change polling fallback
   let _lastHref = location.href;
-  const navInterval = setInterval(() => {
-    if (!isExtensionValid()) {
-      clearInterval(navInterval);
-      teardown();
-      return;
-    }
+  let navInterval = setInterval(() => {
+    if (!isExtensionValid()) return;
     if (location.href !== _lastHref) {
       _lastHref = location.href;
       onNavigate();
@@ -474,7 +483,7 @@
   // ─── Message Bus ──────────────────────────────────────
 
   /** Receive comments from injected.js running in MAIN world */
-  window.addEventListener('message', (event) => {
+  function onWindowMessage(event) {
     if (!isExtensionValid()) return;
     if (
       event.source !== window ||
@@ -482,7 +491,8 @@
       event.data?.type   !== 'YTSC_COMMENTS'
     ) return;
     ingestComments(event.data.comments, event.data.videoId);
-  });
+  }
+  window.addEventListener('message', onWindowMessage);
 
   /** Receive commands from popup.js */
   try {
@@ -538,10 +548,11 @@
   try {
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       chrome.storage.local.get(['enabled', 'displayDuration'], (r) => {
-        if (!isExtensionValid() || chrome.runtime?.lastError) return;
-        if (!r) return;
-        if (r.enabled !== undefined)   state.enabled = r.enabled;
-        if (r.displayDuration)         CONFIG.displayDuration = r.displayDuration;
+        try {
+          if (!isExtensionValid() || !r) return;
+          if (r.enabled !== undefined)   state.enabled = r.enabled;
+          if (r.displayDuration)         CONFIG.displayDuration = r.displayDuration;
+        } catch (_) {}
       });
     }
   } catch (_) {}
