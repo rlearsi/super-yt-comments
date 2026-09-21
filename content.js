@@ -138,21 +138,11 @@
     }
   }
 
-  let _isContextInvalidated = false;
-
   /** Helper to safely check if the extension context is still valid. */
   function isExtensionValid() {
-    if (_isContextInvalidated) return false;
     try {
-      if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.id) {
-        _isContextInvalidated = true;
-        teardown();
-        return false;
-      }
-      return true;
+      return typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
     } catch (_) {
-      _isContextInvalidated = true;
-      teardown();
       return false;
     }
   }
@@ -341,10 +331,6 @@
   // ─── Sync Loop ────────────────────────────────────────
 
   function syncLoop() {
-    if (!isExtensionValid()) {
-      teardown();
-      return;
-    }
     state.rafHandle = requestAnimationFrame(syncLoop);
     if (!state.enabled || !state.videoEl || !state.overlayEl) return;
 
@@ -422,12 +408,6 @@
 
   function teardown() {
     stopSync();
-    if (navInterval) {
-      clearInterval(navInterval);
-      navInterval = null;
-    }
-    window.removeEventListener('message', onWindowMessage);
-    document.removeEventListener('yt-navigate-finish', onYtNavigateFinish);
     document.querySelectorAll('.ytsc-comment-card').forEach(el => el.remove());
     removeOverlay();
     state.comments    = [];
@@ -464,16 +444,11 @@
     }
   }
 
-  function onYtNavigateFinish() {
-    if (!isExtensionValid()) return;
-    onNavigate();
-  }
-  document.addEventListener('yt-navigate-finish', onYtNavigateFinish);
+  document.addEventListener('yt-navigate-finish', onNavigate);
 
   // URL-change polling fallback
   let _lastHref = location.href;
-  let navInterval = setInterval(() => {
-    if (!isExtensionValid()) return;
+  setInterval(() => {
     if (location.href !== _lastHref) {
       _lastHref = location.href;
       onNavigate();
@@ -483,16 +458,14 @@
   // ─── Message Bus ──────────────────────────────────────
 
   /** Receive comments from injected.js running in MAIN world */
-  function onWindowMessage(event) {
-    if (!isExtensionValid()) return;
+  window.addEventListener('message', (event) => {
     if (
       event.source !== window ||
       event.data?.source !== 'yt-super-comments-injected' ||
       event.data?.type   !== 'YTSC_COMMENTS'
     ) return;
     ingestComments(event.data.comments, event.data.videoId);
-  }
-  window.addEventListener('message', onWindowMessage);
+  });
 
   /** Receive commands from popup.js */
   try {
