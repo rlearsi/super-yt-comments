@@ -1,3 +1,12 @@
+## License
+
+This project is licensed under the MIT License.
+See the LICENSE file for details.
+
+# AI Usage
+
+This project was developed with assistance from AI tools.
+
 # Super YouTube Comments 💬▶️
 
 Google Chrome extension that proactively detects YouTube comments containing timestamps (e.g. `2:24`, `01:15:30`) and renders them directly over the video player at the exact moment mentioned.
